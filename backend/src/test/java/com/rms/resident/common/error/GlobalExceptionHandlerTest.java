@@ -29,7 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "RMS_SUPERADMIN_PASSWORD=TestPassword123",
         "RMS_TIMEZONE=Asia/Kolkata",
         "RMS_CORS_ALLOWED_ORIGINS=",
-        "RMS_TRUST_PROXY=false"
+        "RMS_TRUST_PROXY=false",
+        "logging.level.com.rms.resident.common.error.GlobalExceptionHandler=OFF"
 })
 @Import(GlobalExceptionHandlerTest.ClockConfiguration.class)
 class GlobalExceptionHandlerTest {

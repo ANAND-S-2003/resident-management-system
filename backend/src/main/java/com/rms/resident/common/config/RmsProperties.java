@@ -27,6 +27,14 @@ public record RmsProperties(
         if (superadminEmail != null) superadminEmail = superadminEmail.trim().toLowerCase(java.util.Locale.ROOT);
         if (superadminName != null) superadminName = superadminName.trim();
         if (timezone != null) timezone = timezone.trim();
+        if (timezone == null || timezone.isBlank()) {
+            throw new IllegalArgumentException("RMS_TIMEZONE must be a valid time zone (ZoneId)");
+        }
+        try {
+            ZoneId.of(timezone);
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("RMS_TIMEZONE must be a valid time zone (ZoneId): " + timezone, ex);
+        }
         corsAllowedOrigins = corsAllowedOrigins == null ? List.of() : corsAllowedOrigins.stream()
                 .filter(origin -> origin != null && !origin.isBlank())
                 .map(String::trim)
@@ -36,17 +44,6 @@ public record RmsProperties(
     @AssertTrue(message = "RMS_JWT_SECRET must be at least 32 UTF-8 bytes")
     public boolean isJwtSecretAtLeast32Bytes() {
         return jwtSecret != null && jwtSecret.getBytes(StandardCharsets.UTF_8).length >= 32;
-    }
-
-    @AssertTrue(message = "RMS_TIMEZONE must be a valid ZoneId")
-    public boolean isTimezoneValid() {
-        if (timezone == null || timezone.isBlank()) return false;
-        try {
-            ZoneId.of(timezone);
-            return true;
-        } catch (RuntimeException ex) {
-            return false;
-        }
     }
 
     @AssertTrue(message = "RMS_SUPERADMIN_PASSWORD must meet the documented password policy")

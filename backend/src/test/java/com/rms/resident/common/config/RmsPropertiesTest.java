@@ -5,13 +5,20 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import com.rms.resident.common.time.ClockConfiguration;
+
+import java.time.Clock;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RmsPropertiesTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
+            .withInitializer(context -> removeAmbientProperties(context))
             .withUserConfiguration(PropertiesConfiguration.class);
 
     @Test
@@ -20,6 +27,14 @@ class RmsPropertiesTest {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(RmsProperties.class).timezone()).isEqualTo("Asia/Kolkata");
             assertThat(context.getBean(RmsProperties.class).trustProxy()).isFalse();
+        });
+    }
+
+    @Test
+    void validConfigurationStartsAndClockUsesConfiguredTimezone() {
+        runner.withPropertyValues(withTimezone(validProperties(), "Pacific/Auckland")).run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(Clock.class).getZone()).isEqualTo(ZoneId.of("Pacific/Auckland"));
         });
     }
 
@@ -37,8 +52,14 @@ class RmsPropertiesTest {
 
     @Test
     void failsForInvalidTimezone() {
-        runner.withPropertyValues(replace(validProperties(), "rms.timezone=Asia/Kolkata", "rms.timezone=Not/A_Real_Zone"))
-                .run(context -> assertFailureMentions(context, "valid ZoneId"));
+        runner.withPropertyValues(withTimezone(validProperties(), "Not/A_Real_Zone"))
+                .run(context -> assertFailureMentions(context, "RMS_TIMEZONE"));
+    }
+
+    @Test
+    void failsForEmptyTimezone() {
+        runner.withPropertyValues(withTimezone(validProperties(), " "))
+                .run(context -> assertFailureMentions(context, "RMS_TIMEZONE"));
     }
 
     @Test
@@ -65,6 +86,18 @@ class RmsPropertiesTest {
         return java.util.Arrays.stream(source).filter(item -> !item.equals(value)).toArray(String[]::new);
     }
 
+    private static String[] withTimezone(String[] source, String timezone) {
+        String[] withoutDefault = without(source, "rms.timezone=Asia/Kolkata");
+        String[] result = java.util.Arrays.copyOf(withoutDefault, withoutDefault.length + 1);
+        result[result.length - 1] = "rms.timezone=" + timezone;
+        return result;
+    }
+
+    private static void removeAmbientProperties(ConfigurableApplicationContext context) {
+        context.getEnvironment().getPropertySources().remove("systemEnvironment");
+        context.getEnvironment().getPropertySources().remove("systemProperties");
+    }
+
     private static void assertFailureMentions(org.springframework.boot.test.context.assertj.AssertableApplicationContext context, String expected) {
         assertThat(context).hasFailed();
         Throwable failure = context.getStartupFailure();
@@ -78,6 +111,7 @@ class RmsPropertiesTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties(RmsProperties.class)
+    @Import(ClockConfiguration.class)
     static class PropertiesConfiguration {}
 }
 
