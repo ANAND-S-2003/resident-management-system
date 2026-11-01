@@ -9,6 +9,8 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
@@ -38,6 +40,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiErrorResponse> handleApiException(ApiException ex, HttpServletRequest request) {
         return response(ex.errorCode(), ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ApiErrorResponse> handleAccessDenied(HttpServletRequest request) {
+        return response(ErrorCode.FORBIDDEN, "You do not have permission to access this resource", request, List.of());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ApiErrorResponse> handleAuthenticationFailure(HttpServletRequest request) {
+        return response(ErrorCode.UNAUTHENTICATED, "Authentication is required or the token is invalid", request, List.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

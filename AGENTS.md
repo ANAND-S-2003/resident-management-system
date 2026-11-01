@@ -6,6 +6,7 @@
 - Define roles, request statuses, and other fixed identifiers once in shared enums/constants. Do not hardcode IDs, roles, or status strings elsewhere.
 - Validate all input on the backend. Trim strings before validating documented limits. Passwords: at least 8 characters, at most 72 UTF-8 bytes, at least one letter and one digit.
 - Return the documented consistent JSON errors and distinct codes. Do not expose stack traces or sensitive data.
+- Never add a catch-all handler or catch block that can swallow Spring Security exceptions; authorization failures must produce 401/403, never 500.
 - Never store, log, or return plaintext passwords. Persist BCrypt hashes only.
 - JWT access tokens use HS256 and expire after 60 minutes. `RMS_JWT_SECRET` must be present and at least 32 bytes; fail fast otherwise. No refresh tokens in v1.
 - Use the shared `@ValidPassword` annotation for every request DTO that accepts a new password; count UTF-8 bytes for the 72-byte maximum.

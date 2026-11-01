@@ -108,6 +108,41 @@ class GlobalExceptionHandlerTest {
                 .doesNotContain("stackTrace", "IllegalStateException", "SELECT", "secret detail");
     }
 
+    @Test
+    void mapsSecurityExceptionsToStandardForbiddenAndUnauthenticatedErrors() throws Exception {
+        String denied = mockMvc.perform(get("/__test/access-denied"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.timestamp").value("2026-01-02T03:04:05Z"))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("You do not have permission to access this resource"))
+                .andExpect(jsonPath("$.path").value("/__test/access-denied"))
+                .andExpect(jsonPath("$.details").isArray())
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(denied)
+                .doesNotContain("stackTrace", "AccessDeniedException", "AuthorizationDeniedException", "secret authorization rule detail");
+
+        String unauthenticated = mockMvc.perform(get("/__test/authentication-failure"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.timestamp").value("2026-01-02T03:04:05Z"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+                .andExpect(jsonPath("$.message").value("Authentication is required or the token is invalid"))
+                .andExpect(jsonPath("$.path").value("/__test/authentication-failure"))
+                .andExpect(jsonPath("$.details").isArray())
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(unauthenticated)
+                .doesNotContain("stackTrace", "BadCredentialsException", "secret authentication detail");
+
+        String unexpected = mockMvc.perform(get("/__test/boom"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(unexpected)
+                .doesNotContain("stackTrace", "IllegalStateException", "secret detail");
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     static class ClockConfiguration {
         @Bean Clock testClock() {

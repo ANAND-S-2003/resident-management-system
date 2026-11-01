@@ -242,9 +242,20 @@ class AuthenticationIT {
         UserAccount user = createUser(Role.USER, true, PASSWORD);
         UserAccount admin = createUser(Role.ADMIN, true, PASSWORD);
         UserAccount superAdmin = users.findByRole(Role.SUPER_ADMIN).stream().findFirst().orElseThrow();
-        mvc.perform(get("/__test/security/user")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/__test/security/user").header("Authorization", bearer(jwtService.issue(admin).value())))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mvc.perform(get("/__test/security/user"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        String denied = mvc.perform(get("/__test/security/user").header("Authorization", bearer(jwtService.issue(admin).value())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("You do not have permission to access this resource"))
+                .andExpect(jsonPath("$.path").value("/__test/security/user"))
+                .andExpect(jsonPath("$.details").isArray())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(denied).doesNotContain("stackTrace", "AccessDeniedException", "AuthorizationDeniedException");
         mvc.perform(get("/__test/security/user").header("Authorization", bearer(jwtService.issue(user).value())))
                 .andExpect(status().isOk()).andExpect(content().string("USER"));
         mvc.perform(get("/__test/security/admin").header("Authorization", bearer(jwtService.issue(user).value())))
