@@ -232,7 +232,7 @@ class UserCatalogIT {
                 .andExpect(status().isOk()).andReturn();
         for (JsonNode item : mapper.readTree(activeOnly.getResponse().getContentAsString()).get("content"))
             assertThat(item.get("active").asBoolean()).isTrue();
-        assertServiceListed(userAuth, "false", name, id, false);
+        assertServiceListed(userAuth, Role.USER, "false", name, id, false);
         mvc.perform(put("/api/v1/services/{id}", id).header("Authorization", adminAuth).contentType(MediaType.APPLICATION_JSON).content(create))
                 .andExpect(status().isOk());
         String accentName = "Café " + suffix;

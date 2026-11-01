@@ -18,6 +18,10 @@ Foundation monorepo for RMS, a role-based residential community service-request 
 5. Check `http://localhost:8080/actuator/health`.
 6. Stop the application with Ctrl+C, then stop MySQL from the repository root with `docker compose down`.
 
+## Backend verification
+
+From `backend/`, run `mvn clean verify` for the full suite, or `mvn clean verify -Dit.test=UserCatalogIT` to run only `UserCatalogIT`. The clean step removes stale compiled classes before compilation; the build must fail on any Java compile error. Database-backed integration tests require Docker.
+
 ## Repository layout
 
 - `backend/` - Java backend skeleton and schema migrations

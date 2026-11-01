@@ -10,6 +10,10 @@
 | Docker Desktop | Installed and running | `docker --version` and `docker info` |
 | Docker Compose | Docker Desktop bundled plugin | `docker compose version` |
 
+## Backend verification
+
+Run `mvn clean verify` from `backend/` for the full suite, or `mvn clean verify -Dit.test=UserCatalogIT` to run only `UserCatalogIT`. The clean step removes stale compiled classes before compilation, and compile errors must fail the build. Database-backed integration tests require Docker.
+
 ## Environment variables
 
 Copy `.env.example` to an untracked `.env` for local development. The app fails fast if a required application variable is missing or invalid. `MYSQL_ROOT_PASSWORD` is used by the local Compose database container only.
