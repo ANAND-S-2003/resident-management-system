@@ -1,8 +1,5 @@
 package com.rms.resident.common.error;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -12,12 +9,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -119,40 +110,5 @@ class GlobalExceptionHandlerTest {
         }
     }
 
-    @RestController
-    public static class ErrorProbeController {
-        @GetMapping("/__test/error/{code}")
-        void error(@PathVariable ErrorCode code) {
-            throw new ApiException(code, "controlled error");
-        }
-
-        @PostMapping("/__test/body")
-        void body(@Valid @RequestBody ProbeBody body) {}
-
-        @GetMapping("/__test/typed")
-        int typed(@RequestParam int count) {
-            return count;
-        }
-
-        @GetMapping("/__test/minimum")
-        int minimum(@RequestParam @Min(1) int value) {
-            return value;
-        }
-
-        @GetMapping("/__test/optimistic")
-        void optimistic() {
-            throw new OptimisticLockingFailureException("secret detail");
-        }
-
-        @GetMapping("/__test/boom")
-        void boom() {
-            throw new IllegalStateException("secret detail");
-        }
-
-        @PostMapping("/__test/post-only")
-        void postOnly() {}
-    }
-
-    public record ProbeBody(@NotBlank String name) {}
 }
 
