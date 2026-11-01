@@ -1,0 +1,31 @@
+# Generated/build output
+**/target/
+**/build/
+**/dist/
+**/coverage/
+**/node_modules/
+.vite/
+
+# Java
+*.class
+*.jar
+*.war
+hs_err_pid*
+
+# IDE/editor
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
