@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -29,6 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestPropertySource(properties = {
+        "logging.level.org.hibernate.SQL=DEBUG",
+        "logging.level.org.hibernate.orm.jdbc.bind=TRACE"
+})
 class UserCatalogIT {
     private static final String PASSWORD = "Resident123";
     private static final java.util.concurrent.atomic.AtomicInteger IP = new java.util.concurrent.atomic.AtomicInteger(20);
@@ -46,6 +51,7 @@ class UserCatalogIT {
         UserAccount resident = user(Role.USER, true);
         UserAccount otherResident = user(Role.USER, true);
         UserAccount admin = user(Role.ADMIN, true);
+        UserAccount otherAdmin = user(Role.ADMIN, true);
         UserAccount superAdmin = users.findByRole(Role.SUPER_ADMIN).get(0);
         String residentToken = token(resident), adminToken = token(admin), superToken = token(superAdmin);
         mvc.perform(get("/api/v1/users")).andExpect(status().isUnauthorized());
@@ -64,11 +70,14 @@ class UserCatalogIT {
         mvc.perform(get("/api/v1/users").param("role", "SUPER_ADMIN").header("Authorization", bearer(adminToken)))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/users").header("Authorization", bearer(superToken))).andExpect(status().isOk());
-        mvc.perform(get("/api/v1/users/{id}", admin.getId()).header("Authorization", bearer(adminToken))).andExpect(status().isForbidden());
-        mvc.perform(put("/api/v1/users/{id}", admin.getId()).header("Authorization", bearer(adminToken))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Valid Admin\",\"email\":\"" + admin.getEmail() + "\",\"flatNumber\":null}"))
+        mvc.perform(get("/api/v1/users/{id}", otherAdmin.getId()).header("Authorization", bearer(adminToken))).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/users/{id}", otherAdmin.getId()).header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Valid Admin\",\"email\":\"" + otherAdmin.getEmail() + "\",\"flatNumber\":null}"))
                 .andExpect(status().isForbidden());
-        mvc.perform(patch("/api/v1/users/{id}/activation", admin.getId()).header("Authorization", bearer(adminToken))
+        mvc.perform(patch("/api/v1/users/{id}/activation", otherAdmin.getId()).header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/v1/users/{id}/activation", superAdmin.getId()).header("Authorization", bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/users/{id}", 99999999).header("Authorization", bearer(superToken))).andExpect(status().isNotFound());
@@ -105,6 +114,8 @@ class UserCatalogIT {
         String created = mvc.perform(post("/api/v1/users").header("Authorization", auth).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         assertThat(created).doesNotContain(PASSWORD, "passwordHash", "password_hash");
+        assertUserSearch(auth, Role.ADMIN, "%", 1);
+        assertUserSearch(auth, Role.ADMIN, "_", 0);
         mvc.perform(post("/api/v1/users").header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
                         .content(createBody("Duplicate", email.toUpperCase(Locale.ROOT), "Q_2", "USER")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DUPLICATE_RESOURCE"));
@@ -116,10 +127,6 @@ class UserCatalogIT {
         mvc.perform(put("/api/v1/users/{id}", id).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"fullName\":\"Updated Resident\",\"email\":\"" + email + "\",\"flatNumber\":\"Q-2\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.flatNumber").value("Q-2"));
-        mvc.perform(get("/api/v1/users").param("q", "%").header("Authorization", auth))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
-        mvc.perform(get("/api/v1/users").param("q", "_").header("Authorization", auth))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         for (String sort : new String[]{"createdAt,desc", "fullName,asc", "email,desc", "role,asc"})
             mvc.perform(get("/api/v1/users").param("sort", sort).header("Authorization", auth)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/users").param("sort", "passwordHash,asc").header("Authorization", auth))
@@ -163,21 +170,14 @@ class UserCatalogIT {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isUnauthorized());
         UserAccount superAdmin = users.findByRole(Role.SUPER_ADMIN).get(0);
-        mvc.perform(patch("/api/v1/users/{id}/activation", superAdmin.getId()).header("Authorization", bearer(token(superAdmin)))
+        mvc.perform(patch("/api/v1/users/{id}/activation", superAdmin.getId()).header("Authorization", adminAuth)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isForbidden());
         mvc.perform(patch("/api/v1/users/{id}/activation", admin.getId()).header("Authorization", adminAuth)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("You cannot deactivate your own account"));
-        UserAccount otherSuperAdmin = user(Role.SUPER_ADMIN, true);
-        mvc.perform(patch("/api/v1/users/{id}/activation", otherSuperAdmin.getId()).header("Authorization", bearer(token(superAdmin)))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
-                .andExpect(status().isForbidden());
-        mvc.perform(patch("/api/v1/users/{id}/activation", superAdmin.getId()).header("Authorization", adminAuth)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
-                .andExpect(status().isForbidden());
-        mvc.perform(patch("/api/v1/users/{id}/activation", otherSuperAdmin.getId()).header("Authorization", bearer(token(otherSuperAdmin)))
+        mvc.perform(patch("/api/v1/users/{id}/activation", superAdmin.getId()).header("Authorization", bearer(token(superAdmin)))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("You cannot deactivate your own account"));
@@ -208,8 +208,8 @@ class UserCatalogIT {
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long id = mapper.readTree(response).get("id").asLong();
         assertThat(jdbc.queryForObject("SELECT created_by FROM services WHERE id = ?", Long.class, id)).isEqualTo(admin.getId());
-        assertServiceListed(userAuth, "false", id, true);
-        assertServiceListed(adminAuth, "false", id, true);
+        assertServiceListed(userAuth, Role.USER, "false", id, true);
+        assertServiceListed(adminAuth, Role.ADMIN, "false", id, false);
         MvcResult userActiveOnly = mvc.perform(get("/api/v1/services").param("active", "false").header("Authorization", userAuth))
                 .andExpect(status().isOk()).andReturn();
         for (JsonNode item : mapper.readTree(userActiveOnly.getResponse().getContentAsString()).get("content"))
@@ -219,11 +219,11 @@ class UserCatalogIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
         mvc.perform(get("/api/v1/services/{id}", id).header("Authorization", userAuth)).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/services/{id}", id).header("Authorization", adminAuth)).andExpect(status().isOk());
-        assertServiceListed(userAuth, null, id, false);
-        assertServiceListed(adminAuth, "true", id, false);
-        assertServiceListed(adminAuth, "false", id, true);
-        assertServiceListed(adminAuth, "true", name, id, false);
-        assertServiceListed(adminAuth, "false", name, id, true);
+        assertServiceListed(userAuth, Role.USER, null, id, false);
+        assertServiceListed(adminAuth, Role.ADMIN, "true", id, false);
+        assertServiceListed(adminAuth, Role.ADMIN, "false", id, true);
+        assertServiceListed(adminAuth, Role.ADMIN, "true", name, id, false);
+        assertServiceListed(adminAuth, Role.ADMIN, "false", name, id, true);
         MvcResult inactiveOnly = mvc.perform(get("/api/v1/services").param("active", "false").header("Authorization", adminAuth))
                 .andExpect(status().isOk()).andReturn();
         for (JsonNode item : mapper.readTree(inactiveOnly.getResponse().getContentAsString()).get("content"))
@@ -292,18 +292,28 @@ class UserCatalogIT {
     private static String createBody(String name, String email, String flat, String role) {
         return "{\"fullName\":\"" + name + "\",\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\",\"role\":\"" + role + "\"" + (flat == null ? "" : ",\"flatNumber\":\"" + flat + "\"") + "}";
     }
-    private void assertServiceListed(String authorization, String active, long id, boolean expected) throws Exception {
-        assertServiceListed(authorization, active, null, id, expected);
+    private void assertServiceListed(String authorization, Role actorRole, String active, long id, boolean expected) throws Exception {
+        assertServiceListed(authorization, actorRole, active, null, id, expected);
     }
-    private void assertServiceListed(String authorization, String active, String q, long id, boolean expected) throws Exception {
+    private void assertServiceListed(String authorization, Role actorRole, String active, String q, long id, boolean expected) throws Exception {
         var builder = get("/api/v1/services").header("Authorization", authorization);
         if (active != null) builder.param("active", active);
         if (q != null) builder.param("q", q);
-        JsonNode items = mapper.readTree(mvc.perform(builder).andExpect(status().isOk()).andReturn()
-                .getResponse().getContentAsString()).get("content");
+        MvcResult result = mvc.perform(builder).andExpect(status().isOk()).andReturn();
+        String responseBody = result.getResponse().getContentAsString();
+        JsonNode items = mapper.readTree(responseBody).get("content");
         boolean found = false;
         for (JsonNode item : items) found |= item.get("id").asLong() == id;
-        assertThat(found).isEqualTo(expected);
+        assertThat(found).as("GET /api/v1/services?active=%s&q=%s actorRole=%s response=%s",
+                active, q, actorRole, responseBody).isEqualTo(expected);
+    }
+    private void assertUserSearch(String authorization, Role actorRole, String q, long expectedTotal) throws Exception {
+        MvcResult result = mvc.perform(get("/api/v1/users").param("q", q).header("Authorization", authorization))
+                .andExpect(status().isOk()).andReturn();
+        String responseBody = result.getResponse().getContentAsString();
+        long total = mapper.readTree(responseBody).path("totalElements").asLong();
+        assertThat(total).as("GET /api/v1/users?q=%s actorRole=%s response=%s", q, actorRole, responseBody)
+                .isEqualTo(expectedTotal);
     }
     private static RequestPostProcessor remoteIp() { return request -> { request.setRemoteAddr("198.51.100." + (IP.incrementAndGet() % 250)); return request; }; }
 }

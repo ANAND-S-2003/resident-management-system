@@ -43,10 +43,10 @@ public class UserAdministrationService {
             if (actor.role() == Role.ADMIN) predicates.add(cb.equal(root.get("role"), Role.USER));
             else if (role != null) predicates.add(cb.equal(root.get("role"), role));
             if (active != null) predicates.add(cb.equal(root.get("active"), active));
-            String pattern = LikeEscaper.containsPattern(q);
+            LikeEscaper.LikePattern pattern = LikeEscaper.containsPattern(q);
             if (pattern != null) {
-                predicates.add(cb.or(cb.like(cb.lower(root.get("fullName")), pattern, '!'),
-                        cb.like(cb.lower(root.get("email")), pattern, '!')));
+                predicates.add(cb.or(cb.like(cb.lower(root.get("fullName")), pattern.value(), pattern.escapeCharacter()),
+                        cb.like(cb.lower(root.get("email")), pattern.value(), pattern.escapeCharacter())));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };

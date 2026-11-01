@@ -34,9 +34,9 @@ public class ServiceCatalogService {
         Specification<ServiceItem> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (active != null) predicates.add(cb.equal(root.get("active"), active));
-            String pattern = LikeEscaper.containsPattern(q);
+            LikeEscaper.LikePattern pattern = LikeEscaper.containsPattern(q);
             if (pattern != null) {
-                predicates.add(cb.like(cb.lower(root.get("name")), pattern, '!'));
+                predicates.add(cb.like(cb.lower(root.get("name")), pattern.value(), pattern.escapeCharacter()));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };
