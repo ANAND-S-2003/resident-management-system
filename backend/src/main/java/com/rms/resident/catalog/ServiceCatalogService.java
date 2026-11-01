@@ -1,6 +1,5 @@
 package com.rms.resident.catalog;
 
-import com.rms.resident.common.enums.Role;
 import com.rms.resident.common.error.ApiException;
 import com.rms.resident.common.error.ErrorCode;
 import com.rms.resident.common.paging.LikeEscaper;
@@ -18,7 +17,6 @@ import jakarta.persistence.criteria.Predicate;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 @Service
@@ -32,13 +30,13 @@ public class ServiceCatalogService {
     @Transactional(readOnly = true)
     public PageResponse<ServiceResponse> list(AuthenticatedUser actor, String activeValue, String q,
                                                int page, Integer size, String sort) {
-        Boolean active = actor.role() == Role.USER ? true : parseActive(activeValue);
+        Boolean active = ServiceVisibilityPolicy.activeFilter(actor.role(), activeValue);
         Specification<ServiceItem> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (active != null) predicates.add(cb.equal(root.get("active"), active));
-            if (q != null && !q.isBlank()) {
-                String pattern = "%" + LikeEscaper.escape(q.trim().toLowerCase(Locale.ROOT)) + "%";
-                predicates.add(cb.like(cb.lower(root.get("name")), pattern, '\\'));
+            String pattern = LikeEscaper.containsPattern(q);
+            if (pattern != null) {
+                predicates.add(cb.like(cb.lower(root.get("name")), pattern, '!'));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };
@@ -51,7 +49,7 @@ public class ServiceCatalogService {
     @Transactional(readOnly = true)
     public ServiceResponse get(AuthenticatedUser actor, Long id) {
         ServiceItem item = find(id);
-        if (actor.role() == Role.USER && !item.isActive()) notFound();
+        if (!ServiceVisibilityPolicy.mayView(actor.role(), item.isActive())) notFound();
         return ServiceResponse.from(item);
     }
 
@@ -79,12 +77,6 @@ public class ServiceCatalogService {
 
     private ServiceItem find(Long id) {
         return services.findById(id).orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "Service not found"));
-    }
-    private static Boolean parseActive(String value) {
-        if (value == null || value.isBlank()) return null;
-        if ("true".equalsIgnoreCase(value.trim())) return true;
-        if ("false".equalsIgnoreCase(value.trim())) return false;
-        throw new ApiException(ErrorCode.VALIDATION_ERROR, "active must be true or false");
     }
     private static void notFound() { throw new ApiException(ErrorCode.NOT_FOUND, "Service not found"); }
     private static ApiException duplicate() { return new ApiException(ErrorCode.DUPLICATE_RESOURCE, "A service with this name already exists"); }

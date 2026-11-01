@@ -43,10 +43,10 @@ public class UserAdministrationService {
             if (actor.role() == Role.ADMIN) predicates.add(cb.equal(root.get("role"), Role.USER));
             else if (role != null) predicates.add(cb.equal(root.get("role"), role));
             if (active != null) predicates.add(cb.equal(root.get("active"), active));
-            if (q != null && !q.isBlank()) {
-                String pattern = "%" + LikeEscaper.escape(q.trim().toLowerCase(Locale.ROOT)) + "%";
-                predicates.add(cb.or(cb.like(cb.lower(root.get("fullName")), pattern, '\\'),
-                        cb.like(cb.lower(root.get("email")), pattern, '\\')));
+            String pattern = LikeEscaper.containsPattern(q);
+            if (pattern != null) {
+                predicates.add(cb.or(cb.like(cb.lower(root.get("fullName")), pattern, '!'),
+                        cb.like(cb.lower(root.get("email")), pattern, '!')));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };
@@ -85,9 +85,9 @@ public class UserAdministrationService {
     @Transactional
     public UserResponse activate(AuthenticatedUser actor, Long id, boolean active) {
         UserAccount target = find(id);
-        requirePolicy(actor, target, UserAccessPolicy.Operation.ACTIVATE);
         if (!active && target.getId().equals(actor.id()))
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "You cannot deactivate your own account");
+        requirePolicy(actor, target, UserAccessPolicy.Operation.ACTIVATE);
         target.setActive(active, clock.instant());
         return UserResponse.from(users.save(target));
     }

@@ -66,7 +66,7 @@ class UserCatalogIT {
         mvc.perform(get("/api/v1/users").header("Authorization", bearer(superToken))).andExpect(status().isOk());
         mvc.perform(get("/api/v1/users/{id}", admin.getId()).header("Authorization", bearer(adminToken))).andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/users/{id}", admin.getId()).header("Authorization", bearer(adminToken))
-                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Valid Admin\",\"email\":\"" + admin.getEmail() + "\",\"flatNumber\":null}"))
                 .andExpect(status().isForbidden());
         mvc.perform(patch("/api/v1/users/{id}/activation", admin.getId()).header("Authorization", bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
@@ -162,13 +162,25 @@ class UserCatalogIT {
         mvc.perform(patch("/api/v1/users/{id}/activation", resident.getId()).header("Authorization", bearer(userToken))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(patch("/api/v1/users/{id}/activation", admin.getId()).header("Authorization", adminAuth)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
         UserAccount superAdmin = users.findByRole(Role.SUPER_ADMIN).get(0);
         mvc.perform(patch("/api/v1/users/{id}/activation", superAdmin.getId()).header("Authorization", bearer(token(superAdmin)))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/v1/users/{id}/activation", admin.getId()).header("Authorization", adminAuth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("You cannot deactivate your own account"));
+        UserAccount otherSuperAdmin = user(Role.SUPER_ADMIN, true);
+        mvc.perform(patch("/api/v1/users/{id}/activation", otherSuperAdmin.getId()).header("Authorization", bearer(token(superAdmin)))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/v1/users/{id}/activation", superAdmin.getId()).header("Authorization", adminAuth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/v1/users/{id}/activation", otherSuperAdmin.getId()).header("Authorization", bearer(token(otherSuperAdmin)))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("You cannot deactivate your own account"));
         mvc.perform(patch("/api/v1/users/{id}/activation", resident.getId()).header("Authorization", adminAuth)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"active\":true}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
@@ -196,7 +208,7 @@ class UserCatalogIT {
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long id = mapper.readTree(response).get("id").asLong();
         assertThat(jdbc.queryForObject("SELECT created_by FROM services WHERE id = ?", Long.class, id)).isEqualTo(admin.getId());
-        assertServiceListed(userAuth, "false", id, false);
+        assertServiceListed(userAuth, "false", id, true);
         assertServiceListed(adminAuth, "false", id, true);
         MvcResult userActiveOnly = mvc.perform(get("/api/v1/services").param("active", "false").header("Authorization", userAuth))
                 .andExpect(status().isOk()).andReturn();
@@ -208,6 +220,19 @@ class UserCatalogIT {
         mvc.perform(get("/api/v1/services/{id}", id).header("Authorization", userAuth)).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/services/{id}", id).header("Authorization", adminAuth)).andExpect(status().isOk());
         assertServiceListed(userAuth, null, id, false);
+        assertServiceListed(adminAuth, "true", id, false);
+        assertServiceListed(adminAuth, "false", id, true);
+        assertServiceListed(adminAuth, "true", name, id, false);
+        assertServiceListed(adminAuth, "false", name, id, true);
+        MvcResult inactiveOnly = mvc.perform(get("/api/v1/services").param("active", "false").header("Authorization", adminAuth))
+                .andExpect(status().isOk()).andReturn();
+        for (JsonNode item : mapper.readTree(inactiveOnly.getResponse().getContentAsString()).get("content"))
+            assertThat(item.get("active").asBoolean()).isFalse();
+        MvcResult activeOnly = mvc.perform(get("/api/v1/services").param("active", "true").header("Authorization", adminAuth))
+                .andExpect(status().isOk()).andReturn();
+        for (JsonNode item : mapper.readTree(activeOnly.getResponse().getContentAsString()).get("content"))
+            assertThat(item.get("active").asBoolean()).isTrue();
+        assertServiceListed(userAuth, "false", name, id, false);
         mvc.perform(put("/api/v1/services/{id}", id).header("Authorization", adminAuth).contentType(MediaType.APPLICATION_JSON).content(create))
                 .andExpect(status().isOk());
         String accentName = "Café " + suffix;
@@ -268,8 +293,12 @@ class UserCatalogIT {
         return "{\"fullName\":\"" + name + "\",\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\",\"role\":\"" + role + "\"" + (flat == null ? "" : ",\"flatNumber\":\"" + flat + "\"") + "}";
     }
     private void assertServiceListed(String authorization, String active, long id, boolean expected) throws Exception {
+        assertServiceListed(authorization, active, null, id, expected);
+    }
+    private void assertServiceListed(String authorization, String active, String q, long id, boolean expected) throws Exception {
         var builder = get("/api/v1/services").header("Authorization", authorization);
         if (active != null) builder.param("active", active);
+        if (q != null) builder.param("q", q);
         JsonNode items = mapper.readTree(mvc.perform(builder).andExpect(status().isOk()).andReturn()
                 .getResponse().getContentAsString()).get("content");
         boolean found = false;

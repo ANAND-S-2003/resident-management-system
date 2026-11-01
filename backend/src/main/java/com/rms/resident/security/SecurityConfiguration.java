@@ -75,6 +75,19 @@ public class SecurityConfiguration {
                                 "/api/v1/contact-queries").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").denyAll()
+                        .requestMatchers("/api/v1/users", "/api/v1/users/**").hasAnyAuthority(
+                                com.rms.resident.common.enums.Role.ADMIN_AUTHORITY,
+                                com.rms.resident.common.enums.Role.SUPER_ADMIN_AUTHORITY)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/services", "/api/v1/services/**").hasAnyAuthority(
+                                com.rms.resident.common.enums.Role.ADMIN_AUTHORITY,
+                                com.rms.resident.common.enums.Role.SUPER_ADMIN_AUTHORITY)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/services/**").hasAnyAuthority(
+                                com.rms.resident.common.enums.Role.ADMIN_AUTHORITY,
+                                com.rms.resident.common.enums.Role.SUPER_ADMIN_AUTHORITY)
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/services/**").hasAnyAuthority(
+                                com.rms.resident.common.enums.Role.ADMIN_AUTHORITY,
+                                com.rms.resident.common.enums.Role.SUPER_ADMIN_AUTHORITY)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/services", "/api/v1/services/**").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, CorsFilter.class);
         return http.build();
