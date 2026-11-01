@@ -7,6 +7,7 @@ import com.rms.resident.common.ratelimit.RateLimiter;
 import com.rms.resident.user.UserAccountRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -53,12 +54,13 @@ public class SecurityConfiguration {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService,
                                             UserAccountRepository users, SecurityErrorWriter errorWriter,
-                                            RateLimiter rateLimiter, ClientIpResolver clientIpResolver,
+                                            @Qualifier("registerRateLimiter") RateLimiter registerRateLimiter,
+                                            ClientIpResolver clientIpResolver,
                                             CorsConfigurationSource corsConfigurationSource,
                                             ApiAuthenticationEntryPoint entryPoint,
                                             ApiAccessDeniedHandler deniedHandler) throws Exception {
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, users, errorWriter,
-                rateLimiter, clientIpResolver);
+                registerRateLimiter, clientIpResolver);
         http
                 // CSRF is disabled because this API uses stateless bearer tokens and does not use cookies.
                 .csrf(csrf -> csrf.disable())

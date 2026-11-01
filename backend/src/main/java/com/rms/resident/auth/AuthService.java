@@ -10,18 +10,16 @@ import com.rms.resident.user.UserAccount;
 import com.rms.resident.user.UserAccountRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Locale;
 
 @Service
 public class AuthService {
     private static final String DUMMY_BCRYPT_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
-    private static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);
-    private static final int LOGIN_LIMIT = 5;
 
     private final UserAccountRepository users;
     private final PasswordEncoder passwordEncoder;
@@ -31,7 +29,8 @@ public class AuthService {
     private final Clock clock;
 
     public AuthService(UserAccountRepository users, PasswordEncoder passwordEncoder, JwtService jwtService,
-                       RateLimiter rateLimiter, ClientIpResolver clientIpResolver, Clock clock) {
+                       @Qualifier("loginRateLimiter") RateLimiter rateLimiter,
+                       ClientIpResolver clientIpResolver, Clock clock) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -53,7 +52,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request, HttpServletRequest servletRequest) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         String key = "login:" + clientIpResolver.resolve(servletRequest) + ":" + email;
-        RateLimiter.Decision decision = rateLimiter.tryAcquire(key, LOGIN_LIMIT, LOGIN_WINDOW);
+        RateLimiter.Decision decision = rateLimiter.tryAcquire(key);
         if (!decision.allowed()) {
             throw new RateLimitException(decision.retryAfterSeconds());
         }

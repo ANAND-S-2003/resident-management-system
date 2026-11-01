@@ -18,7 +18,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -27,21 +26,19 @@ import java.util.regex.Pattern;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Pattern BEARER = Pattern.compile("(?i)^Bearer\\s+(.+)$");
     private static final String REGISTER_PATH = "/api/v1/auth/register";
-    private static final Duration REGISTER_WINDOW = Duration.ofHours(1);
-    private static final int REGISTER_LIMIT = 10;
 
     private final JwtService jwtService;
     private final UserAccountRepository users;
     private final SecurityErrorWriter errorWriter;
-    private final RateLimiter rateLimiter;
+    private final RateLimiter registerRateLimiter;
     private final ClientIpResolver clientIpResolver;
 
     public JwtAuthenticationFilter(JwtService jwtService, UserAccountRepository users, SecurityErrorWriter errorWriter,
-                                   RateLimiter rateLimiter, ClientIpResolver clientIpResolver) {
+                                   RateLimiter registerRateLimiter, ClientIpResolver clientIpResolver) {
         this.jwtService = jwtService;
         this.users = users;
         this.errorWriter = errorWriter;
-        this.rateLimiter = rateLimiter;
+        this.registerRateLimiter = registerRateLimiter;
         this.clientIpResolver = clientIpResolver;
     }
 
@@ -57,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if ("POST".equals(request.getMethod()) && REGISTER_PATH.equals(request.getRequestURI())) {
             String key = "register:" + clientIpResolver.resolve(request);
-            RateLimiter.Decision decision = rateLimiter.tryAcquire(key, REGISTER_LIMIT, REGISTER_WINDOW);
+            RateLimiter.Decision decision = registerRateLimiter.tryAcquire(key);
             if (!decision.allowed()) {
                 response.setHeader("Retry-After", Long.toString(decision.retryAfterSeconds()));
                 errorWriter.write(request, response, ErrorCode.TOO_MANY_REQUESTS, "Registration rate limit exceeded");

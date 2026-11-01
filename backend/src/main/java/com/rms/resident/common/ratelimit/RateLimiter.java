@@ -1,7 +1,5 @@
 package com.rms.resident.common.ratelimit;
 
-import org.springframework.stereotype.Component;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -10,20 +8,42 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
 
-@Component
 public class RateLimiter {
     private final Clock clock;
     private final int maxTrackedKeys;
+    private final Integer configuredLimit;
+    private final Duration configuredWindow;
     private final Map<String, Window> windows = new HashMap<>();
 
     public RateLimiter(Clock clock) {
-        this(clock, 10_000);
+        this(clock, 10_000, null, null);
     }
 
     RateLimiter(Clock clock, int maxTrackedKeys) {
+        this(clock, maxTrackedKeys, null, null);
+    }
+
+    RateLimiter(Clock clock, int maxTrackedKeys, int limit, Duration duration) {
+        this(clock, maxTrackedKeys, Integer.valueOf(limit), duration);
+    }
+
+    private RateLimiter(Clock clock, int maxTrackedKeys, Integer configuredLimit, Duration configuredWindow) {
         if (maxTrackedKeys < 1) throw new IllegalArgumentException("maxTrackedKeys must be positive");
+        if (configuredLimit != null && (configuredLimit < 1 || configuredWindow == null
+                || configuredWindow.isZero() || configuredWindow.isNegative())) {
+            throw new IllegalArgumentException("Configured rate limit and duration must be valid");
+        }
         this.clock = clock;
         this.maxTrackedKeys = maxTrackedKeys;
+        this.configuredLimit = configuredLimit;
+        this.configuredWindow = configuredWindow;
+    }
+
+    public Decision tryAcquire(String key) {
+        if (configuredLimit == null) {
+            throw new IllegalStateException("This RateLimiter has no configured limit");
+        }
+        return tryAcquire(key, configuredLimit, configuredWindow);
     }
 
     public synchronized Decision tryAcquire(String key, int limit, Duration duration) {
