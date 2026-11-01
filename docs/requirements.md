@@ -2,52 +2,63 @@
 
 ## Purpose and roles
 
-RMS supports residential service requests. Residents submit and track requests; administrators manage the catalog and service operations; super administrators manage administrator accounts and have system-wide visibility.
+RMS supports residential service requests. Residents submit and track requests; administrators manage the catalog and service operations; super administrators manage administrator accounts and have system-wide visibility. All accounts are rows in one `users` table with one role: `USER`, `ADMIN`, or `SUPER_ADMIN`.
 
-All accounts are rows in one `users` table, distinguished by role: `USER`, `ADMIN`, or `SUPER_ADMIN`.
+- Anyone may register an account as `USER`. Public registration cannot set a role.
+- `ADMIN` users may create, edit, and deactivate `USER` accounts only.
+- Only `SUPER_ADMIN` users may create, edit, and deactivate `ADMIN` accounts. A super admin may also manage USER accounts.
+- `SUPER_ADMIN` is created once at startup from environment variables (email, name, password) only when no super admin exists. No API registers or promotes an account to `SUPER_ADMIN`.
+- Login uses email and password. Emails are stored lowercase and unique. Passwords are BCrypt hashes; plaintext passwords never appear in API responses. Passwords must be 8–72 characters and contain at least one letter and one digit; the backend validates this.
+- JWT uses HS256 access tokens valid for 60 minutes. The signing secret is read from an environment variable, must be at least 32 bytes, and missing/short secrets cause startup failure. There are no refresh tokens in v1.
+- Every protected endpoint checks authorization on the server and checks the account's active flag on every request. Deactivated users cannot log in; their existing JWTs stop working.
 
-- Anyone may register an account as `USER`. Public registration must not accept a role override.
-- `ADMIN` users may create, edit, and deactivate `USER` accounts.
-- Only `SUPER_ADMIN` users may create, edit, and deactivate `ADMIN` accounts. Super administrators may view system-wide information.
-- Login uses email and password. Passwords are stored as BCrypt hashes. Authentication uses JWT; the server enforces authorization for every protected endpoint.
-- Deactivation prevents further login and authenticated access; historical records remain.
+## Users and services
 
-## Service catalog
-
-Administrators manage service categories such as Plumbing, Electrical, Cleaning, Painting, and Internet Repair. Services can be activated/deactivated; existing requests retain their service association and displayable service name when a service is inactive.
+`flat_number` is required for USER profiles and null for ADMIN and SUPER_ADMIN. Admins manage the service catalog (for example Plumbing, Electrical, Cleaning, Painting, Internet Repair). Services have an active flag. Deactivate rather than delete users or services; records with history are never hard-deleted. Existing requests retain their service reference and displayable service name when a service is deactivated.
 
 ## Service requests
 
-A request has a resident, flat number, service, description, request date, expected completion date, status, and admin remarks. Residents can create and view their own requests. Administrators can view/manage requests across residents. Super administrators can view all requests and dashboard information. Lists are paginated and request filtering by status is supported.
+A request records the resident, a copy of the resident's flat number at creation, service, description, request date, expected completion date, status, and admin remarks. The request date is assigned by the server at creation and is never accepted from a client. The client does not send a resident/user ID; the server uses the authenticated USER. Expected completion date must be on or after request date.
 
-Status is exactly one of `PENDING`, `IN_PROGRESS`, `COMPLETED`, or `REJECTED`. A request is overdue only if its expected completion date is earlier than the current date and its status is `PENDING` or `IN_PROGRESS`. Overdue is calculated at read time and never persisted. `COMPLETED` and `REJECTED` requests are never overdue.
+Status is exactly one of `PENDING`, `IN_PROGRESS`, `COMPLETED`, or `REJECTED`. Backend-enforced transitions are:
 
-## Notifications
+- `PENDING` → `IN_PROGRESS` or `REJECTED`
+- `IN_PROGRESS` → `COMPLETED` or `REJECTED`
+- `COMPLETED` and `REJECTED` are final
 
-When an administrator changes a request status, the resident receives an in-app notification. Residents can list their notifications and mark a notification as read. A status change by an admin creates one notification for that resident.
+An invalid transition returns HTTP 409 with a clear message. Setting status to `REJECTED` requires non-empty admin remarks.
 
-## Dashboard
+A request is overdue exactly when its expected completion date is before the current date and its status is `PENDING` or `IN_PROGRESS`. Overdue is computed at read time and never stored. `COMPLETED` and `REJECTED` requests are never overdue.
 
-The super-admin dashboard shows counts by each status and the overdue count. Request filtering by status is supported.
+Residents can create and view their own requests. Admins manage requests across residents. Super admins can view all requests and dashboard information. Lists are paginated and requests can be filtered by status.
 
-## Contact
+## Notifications and dashboard
 
-A logged-in or anonymous visitor can submit a contact query. Administrators can list and view submitted queries. Contact query fields are name, email, subject, and message; authenticated submissions may prefill identity but do not require login.
+When an admin changes a request's status, the resident receives an in-app notification. Residents can list their notifications and mark them as read. The super-admin dashboard shows counts by each status and the overdue count.
+
+## Contact and rate limits
+
+An anonymous or logged-in visitor can submit a contact query; admins can list and view queries. Planned rate limits (implementation deferred): login is limited to 5 failed attempts per account and source IP in a rolling 15-minute window; anonymous contact submissions are limited to 5 per source IP per hour. Exceeding a limit returns HTTP 429. The exact counting/storage mechanism will be selected during implementation.
 
 ## Non-functional requirements
 
-- Validate all input server-side.
+- Validate all input on the backend.
 - Paginate list endpoints.
 - Use a consistent JSON error format.
-- Never expose plaintext passwords in API responses or elsewhere; use BCrypt hashes at rest.
-- Use environment variables for secrets and deployment-specific configuration.
+- Never expose plaintext passwords or password hashes in API responses.
+- Use environment variables for secrets and deployment-specific configuration; fail fast for missing required JWT/bootstrap configuration.
 
-## Assumptions and items to confirm
+## Future work (out of scope for v1)
 
-- Email is unique case-insensitively and is the login identifier.
-- Flat number is required but is not globally unique; no building/household table is introduced in this foundation.
-- Dates are calendar dates (`DATE`), not timestamps. A request date defaults to the server's current date; clients cannot backdate it. Expected completion date cannot precede request date.
-- Admins may update a request's status and remarks; the API draft permits transitions among the four statuses because no transition matrix was specified. A status change notification is created only when the status value actually changes.
-- Residents cannot edit or cancel requests after submission in the initial contract; no such action was specified.
-- Deactivation is represented by `is_active=false`; deletion is not physical.
-- This design does not specify password reset, email verification, refresh-token/logout semantics, notification retention, contact-query response workflow, or audit history. These need decisions before implementation.
+- Password reset
+- Email verification
+- Refresh tokens
+- Email/SMS notifications
+- WebSocket push
+
+## Other implementation assumptions
+
+- Flat numbers are not globally unique; no building/household table is introduced in v1.
+- Request dates and expected completion dates are calendar dates (`DATE`); overdue uses the server's current date.
+- Service names are unique. Public login failure does not distinguish an unknown email, bad password, or inactive account.
+- Notification retention, contact-query response workflow, and audit history are not specified. No hard-delete operations are provided for records with history.
