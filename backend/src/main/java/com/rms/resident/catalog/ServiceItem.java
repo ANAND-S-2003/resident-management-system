@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(name = "services", uniqueConstraints = @UniqueConstraint(name = "uq_services_name", columnNames = "name"))
@@ -29,4 +30,26 @@ public class ServiceItem {
     private Instant updatedAt;
 
     protected ServiceItem() {}
+
+    public static ServiceItem create(String name, String description, Long createdBy, Instant now) {
+        ServiceItem item = new ServiceItem();
+        item.name = name; item.description = description; item.createdBy = createdBy;
+        item.active = true; item.createdAt = now; item.updatedAt = now;
+        return item;
+    }
+    public void update(String name, String description, Instant now) {
+        this.name = name; this.description = description; this.updatedAt = Objects.requireNonNull(now);
+    }
+    public void setActive(boolean active, Instant now) {
+        if (this.active != active) {
+            this.active = active; this.updatedAt = Objects.requireNonNull(now);
+        }
+    }
+    public Long getId() { return id; }
+    public String getName() { return name; }
+    public String getDescription() { return description; }
+    public boolean isActive() { return active; }
+    public Long getCreatedBy() { return createdBy; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }

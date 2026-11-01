@@ -57,6 +57,20 @@ public class UserAccount {
         this.updatedAt = Objects.requireNonNull(now);
     }
 
+    public void updateProfile(String fullName, String email, String flatNumber, Instant now) {
+        this.fullName = fullName;
+        this.email = email;
+        this.flatNumber = flatNumber;
+        this.updatedAt = Objects.requireNonNull(now);
+    }
+
+    public void setActive(boolean active, Instant now) {
+        if (this.active != active) {
+            this.active = active;
+            this.updatedAt = Objects.requireNonNull(now);
+        }
+    }
+
     public Long getId() { return id; }
     public String getFullName() { return fullName; }
     public String getEmail() { return email; }

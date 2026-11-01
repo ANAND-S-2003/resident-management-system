@@ -7,6 +7,7 @@ RMS supports residential service requests. Residents submit and track requests; 
 - Anyone may register only as `USER`. Public registration cannot set or override a role.
 - `ADMIN` may create, edit, and deactivate `USER` accounts only. Accessing, editing, or deactivating a non-USER account as ADMIN returns `403 FORBIDDEN`.
 - `SUPER_ADMIN` may create, edit, and deactivate `USER` and `ADMIN` accounts. No API creates or promotes an account to `SUPER_ADMIN`.
+- Account activation changes are idempotent. A caller cannot deactivate their own account; the API returns `400 VALIDATION_ERROR`. A `SUPER_ADMIN` account cannot be deactivated through user management.
 - Create the initial `SUPER_ADMIN` at startup from environment variables only if one does not already exist.
 - Login is by lowercase email and password. Passwords are BCrypt hashes and never returned. Passwords require at least 8 characters, at most 72 UTF-8 bytes, one letter, and one digit; backend validation returns a clear message.
 - Unknown email, incorrect password, and inactive account login attempts return the same `401 INVALID_CREDENTIALS` response. Unknown email still performs a BCrypt comparison against a dummy hash.

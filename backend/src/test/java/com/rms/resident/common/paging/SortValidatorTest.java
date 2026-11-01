@@ -49,4 +49,15 @@ class SortValidatorTest {
         assertThat(SortValidator.clampSize(200)).isEqualTo(100);
         assertThat(SortValidator.clampSize(0)).isEqualTo(1);
     }
+
+    @Test
+    void acceptsEveryDocumentedUserSortFieldIncludingRoleAndRejectsUnknownField() {
+        Set<String> userFields = Set.of("createdAt", "fullName", "email", "role");
+        for (String field : userFields) {
+            assertThat(SortValidator.parse(field + ",asc", "createdAt,desc", userFields).field()).isEqualTo(field);
+        }
+        assertThatThrownBy(() -> SortValidator.parse("unknown,asc", "createdAt,desc", userFields))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Unsupported sort field");
+    }
 }

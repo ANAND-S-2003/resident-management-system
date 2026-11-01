@@ -52,7 +52,7 @@ Registration and login passwords use BCrypt with strength 10. The shared passwor
 ADMIN may manage USER accounts only. Accessing, editing, or deactivating a non-USER account as ADMIN returns 403 `FORBIDDEN`. SUPER_ADMIN may manage USER and ADMIN but neither role can create/promote SUPER_ADMIN.
 
 ### `GET /users` - ADMIN, SUPER_ADMIN
-Query `q` case-insensitive contains on name or email; optional `role`, `active`; pagination. Sort whitelist: `createdAt`, `fullName`, `email`, `role`; default `createdAt,desc`. ADMIN sees USER only; a request to access non-USER accounts returns 403; SUPER_ADMIN may see all roles.
+Query `q` case-insensitive contains on name or email; optional `role`, `active`; pagination. Sort whitelist: `createdAt`, `fullName`, `email`, `role`; default `createdAt,desc`. The `q` value is matched literally; percent signs, underscores, and backslashes are escaped and do not act as LIKE wildcards. ADMIN sees USER only; passing `role=ADMIN` or `role=SUPER_ADMIN` returns 403; SUPER_ADMIN may see all roles.
 Response 200 page of `{id,fullName,email,role,flatNumber,active,createdAt}`.
 Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
@@ -72,14 +72,14 @@ Response 200 `{id,fullName,email,role,flatNumber,active,createdAt,updatedAt}`.
 Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, 409 `DUPLICATE_RESOURCE`.
 
 ### `PATCH /users/{userId}/activation` - ADMIN, SUPER_ADMIN
-Request `{active:boolean}`. ADMIN may activate/deactivate USER only; SUPER_ADMIN may activate/deactivate USER or ADMIN. Cannot deactivate own account. Deactivation blocks login and existing JWTs on next request.
+Request `{active:boolean}`. ADMIN may activate/deactivate USER only; SUPER_ADMIN may activate/deactivate USER or ADMIN. Cannot deactivate own account; this returns 400 `VALIDATION_ERROR`. SUPER_ADMIN accounts cannot be deactivated through this API. Activation/deactivation is idempotent. Deactivation blocks login and existing JWTs on next request.
 Response 200 `{id,fullName,email,role,flatNumber,active}`.
 Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
 ## Services
 
 ### `GET /services` - USER, ADMIN, SUPER_ADMIN
-Query `q` case-insensitive contains on name; optional `active`; pagination. Sort whitelist: `name`, `createdAt`; default `name,asc`. USER always sees active services; ignore `active` for USER. ADMIN+ may pass true/false or omit for all.
+Query `q` case-insensitive contains on name; optional `active`; pagination. The `q` value is matched literally; percent signs, underscores, and backslashes are escaped and do not act as LIKE wildcards. Sort whitelist: `name`, `createdAt`; default `name,asc`. USER always sees active services; ignore `active` for USER. ADMIN+ may pass true/false or omit for all.
 Response 200 page of `{id,name,description,active}`.
 Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
