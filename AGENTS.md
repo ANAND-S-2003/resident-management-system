@@ -12,6 +12,7 @@
 - Bootstrap a SUPER_ADMIN from environment variables only when none exists. Never expose an API to create or promote a SUPER_ADMIN.
 - Soft-deactivate users and services. Never hard-delete records with history.
 - Render descriptions, remarks, and contact messages as plain text, never as HTML.
-- Use `RMS_TIMEZONE` and one injectable `Clock` for request dates and overdue checks. Configure JDBC and Hibernate to UTC.
+- Use `RMS_TIMEZONE` and one injectable `Clock` for request dates and overdue checks. Configure JDBC and Hibernate to UTC. Any code needing now/today must use this `Clock`.
+- Never edit a Flyway migration after it has been committed; add a new `V<n>` migration instead.
 - After each task, run the relevant build and tests and report results honestly, including failures.
 - Keep requirements, data model, and authoritative v1 API contract consistent; update docs when decisions change.

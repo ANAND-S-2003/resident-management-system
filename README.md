@@ -1,21 +1,27 @@
 # Resident Management System
 
-Foundation repository for RMS, a role-based residential community service-request application.
+Foundation monorepo for RMS, a role-based residential community service-request application.
 
 ## Planned stack
 
-- Backend: Java 17, Spring Boot 3.x, Maven 3.9+, Spring Security/JWT, Spring Data JPA, Flyway, MySQL 8.4 LTS
+- Backend: Java 17, Spring Boot 3.x, Maven 3.9+, Spring Data JPA, Flyway, MySQL 8.4 LTS; Spring Security/JWT is planned for a later step
 - Frontend: React, Vite, React Router, Axios; Node.js 22 and npm
 - Tests: JUnit 5/Testcontainers, Vitest/React Testing Library, Cucumber
 - Packaging and CI: Docker Desktop, Docker Compose, GitHub Actions
 
+## Backend local run (Windows PowerShell)
+
+1. From the repository root, copy `.env.example` to `.env` and replace its dummy values with local development values.
+2. Start MySQL: `docker compose up -d db`.
+3. Load variables into the current PowerShell session: `. .\scripts\load-env.ps1`.
+4. In that same session, start the backend: `mvn spring-boot:run` from `backend/`.
+5. Check `http://localhost:8080/actuator/health`.
+6. Stop the application with Ctrl+C, then stop MySQL from the repository root with `docker compose down`.
+
 ## Repository layout
 
-- `backend/` - backend application (intentionally empty in this foundation step)
-- `frontend/` - frontend application (intentionally empty in this foundation step)
+- `backend/` - Java backend skeleton and schema migrations
+- `frontend/` - intentionally empty for now
 - `docs/` - requirements, data model, API, and environment guide
-- `.github/workflows/` - CI workflows (intentionally empty in this foundation step)
-
-## Environment prerequisites
-
-Use Java 17, Maven 3.9+, Node.js 22, npm, Git, and running Docker Desktop. Verification commands and required environment variables are in `docs/environment.md`. Review the design docs before implementing features. No application code is included yet.
+- `.github/workflows/` - intentionally empty for now
+- `scripts/` - local environment helper scripts

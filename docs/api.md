@@ -2,7 +2,7 @@
 
 This is the authoritative v1 contract. Base path: `/api/v1`. JSON uses `application/json`; dates are ISO `YYYY-MM-DD`; timestamps are UTC ISO-8601. JWT access tokens use HS256 and expire after 60 minutes; send as `Authorization: Bearer <token>`. Every authenticated request checks the user's active flag. Roles are exactly `USER`, `ADMIN`, and `SUPER_ADMIN`; `ADMIN+` means ADMIN or SUPER_ADMIN. No API creates or promotes SUPER_ADMIN.
 
-All lists use `{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0}` and accept zero-based `page` (default 0), `size` (default 20, maximum 100), and `sort=<field>,<asc|desc>`. Invalid sort field/direction returns `400 VALIDATION_ERROR`. Strings are trimmed before validation. No response includes a password or password hash. Passwords require at least 8 characters, at most 72 UTF-8 bytes, one letter and one digit. Invalid password message: "Password must be at least 8 characters, no more than 72 UTF-8 bytes, and include at least one letter and one digit."
+All lists use `{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0}` and accept zero-based `page` (default 0), `size` (default 20, clamped to 1-100), and `sort=<field>,<asc|desc>`. Invalid sort field/direction returns `400 VALIDATION_ERROR`. Strings are trimmed before validation. No response includes a password or password hash. Passwords require at least 8 characters, at most 72 UTF-8 bytes, one letter and one digit. Invalid password message: "Password must be at least 8 characters, no more than 72 UTF-8 bytes, and include at least one letter and one digit."
 
 ## Error codes
 
@@ -14,6 +14,7 @@ All lists use `{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0
 | 401 | `INVALID_CREDENTIALS` | Login failure; same response for unknown email and wrong password |
 | 403 | `FORBIDDEN` | Caller lacks permission |
 | 404 | `NOT_FOUND` | Missing resource or concealed by ownership rules |
+| 405 | `METHOD_NOT_ALLOWED` | HTTP method is not supported for the path |
 | 409 | `DUPLICATE_RESOURCE` | Duplicate email or service name |
 | 409 | `INVALID_STATUS_TRANSITION` | Transition is not allowed |
 | 409 | `CONCURRENT_MODIFICATION` | Optimistic-lock version conflict |
@@ -179,3 +180,4 @@ Response 200 `{"status":"UP"}` or 503 `{"status":"DOWN"}` only; no details.
 Counters are in-memory; v1 runs one instance. Login: 5 failed attempts per rolling 15 minutes keyed by socket client IP + lowercase email; success resets key. Registration: 10/hour/IP. Anonymous contact: 5/hour/IP. Every 429 has `Retry-After` seconds. Use socket IP unless `RMS_TRUST_PROXY=true`, when `X-Forwarded-For` is trusted. Multi-instance deployment requires shared counters such as Redis.
 
 CORS allowed origins come from comma-separated `RMS_CORS_ALLOWED_ORIGINS`. Allow only required methods and headers. Never use wildcard origins with credentials or authorization headers.
+
