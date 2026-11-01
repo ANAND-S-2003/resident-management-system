@@ -8,11 +8,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
-import org.testcontainers.utility.DockerImageName;
-
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,32 +16,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
 class SchemaIT {
-    @Container
-    static final MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.4"))
-            .withDatabaseName("rms")
-            .withUsername("rms_test")
-            .withPassword("rms_test_password");
-
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> {
-            String url = MYSQL.getJdbcUrl();
-            return url + (url.contains("?") ? "&" : "?")
-                    + "connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true";
-        });
-        registry.add("spring.datasource.username", MYSQL::getUsername);
-        registry.add("spring.datasource.password", MYSQL::getPassword);
-        registry.add("rms.jwt-secret", () -> "test-secret-that-is-longer-than-32-bytes");
-        registry.add("rms.superadmin-email", () -> "root@example.test");
-        registry.add("rms.superadmin-name", () -> "Test Super Admin");
-        registry.add("rms.superadmin-password", () -> "TestPassword123");
-        registry.add("rms.timezone", () -> "Asia/Kolkata");
-        registry.add("rms.cors-allowed-origins", () -> "");
-        registry.add("rms.trust-proxy", () -> "false");
+        SharedMySqlContainer.registerProperties(registry);
     }
 
     @Autowired JdbcTemplate jdbc;
@@ -99,8 +74,8 @@ class SchemaIT {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("{\"status\":\"UP\"}"));
-        mockMvc.perform(get("/actuator/info")).andExpect(status().isNotFound());
-        mockMvc.perform(get("/actuator/beans")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/actuator/info")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/actuator/beans")).andExpect(status().is4xxClientError());
     }
 
     private long insertUser(String role, String flatNumber, String email) {

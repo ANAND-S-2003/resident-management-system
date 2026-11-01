@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(name = "users", uniqueConstraints = @UniqueConstraint(name = "uq_users_email", columnNames = "email"))
@@ -36,4 +37,33 @@ public class UserAccount {
     private Instant updatedAt;
 
     protected UserAccount() {}
+
+    public static UserAccount create(String fullName, String email, String passwordHash, Role role,
+                                     String flatNumber, Instant now) {
+        UserAccount user = new UserAccount();
+        user.fullName = fullName;
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.role = role;
+        user.flatNumber = flatNumber;
+        user.active = true;
+        user.createdAt = now;
+        user.updatedAt = now;
+        return user;
+    }
+
+    public void changePasswordHash(String passwordHash, Instant now) {
+        this.passwordHash = Objects.requireNonNull(passwordHash);
+        this.updatedAt = Objects.requireNonNull(now);
+    }
+
+    public Long getId() { return id; }
+    public String getFullName() { return fullName; }
+    public String getEmail() { return email; }
+    public String getPasswordHash() { return passwordHash; }
+    public Role getRole() { return role; }
+    public String getFlatNumber() { return flatNumber; }
+    public boolean isActive() { return active; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }

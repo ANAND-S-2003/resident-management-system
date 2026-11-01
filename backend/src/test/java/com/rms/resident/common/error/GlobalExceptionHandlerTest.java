@@ -3,9 +3,12 @@ package com.rms.resident.common.error;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "RMS_TRUST_PROXY=false",
         "logging.level.com.rms.resident.common.error.GlobalExceptionHandler=OFF"
 })
+@AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandlerTest.ClockConfiguration.class)
 class GlobalExceptionHandlerTest {
     @Autowired MockMvc mockMvc;
@@ -108,6 +112,10 @@ class GlobalExceptionHandlerTest {
     static class ClockConfiguration {
         @Bean Clock testClock() {
             return Clock.fixed(Instant.parse("2026-01-02T03:04:05Z"), ZoneOffset.UTC);
+        }
+
+        @Bean UserDetailsService suppressGeneratedTestPassword() {
+            return username -> { throw new UsernameNotFoundException("No test password authentication is configured"); };
         }
     }
 

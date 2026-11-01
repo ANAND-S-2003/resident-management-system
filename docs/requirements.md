@@ -9,7 +9,10 @@ RMS supports residential service requests. Residents submit and track requests; 
 - `SUPER_ADMIN` may create, edit, and deactivate `USER` and `ADMIN` accounts. No API creates or promotes an account to `SUPER_ADMIN`.
 - Create the initial `SUPER_ADMIN` at startup from environment variables only if one does not already exist.
 - Login is by lowercase email and password. Passwords are BCrypt hashes and never returned. Passwords require at least 8 characters, at most 72 UTF-8 bytes, one letter, and one digit; backend validation returns a clear message.
+- Unknown email, incorrect password, and inactive account login attempts return the same `401 INVALID_CREDENTIALS` response. Unknown email still performs a BCrypt comparison against a dummy hash.
+- Changing a password requires the correct current password, a new password that meets the shared policy, and a new password different from the current password.
 - JWT access tokens use HS256, expire after 60 minutes, and use `RMS_JWT_SECRET` (minimum 32 bytes). No refresh tokens in v1. Missing/invalid required configuration fails startup.
+- Tokens use the user ID as `sub`, the role as a claim, and issuer `rms`; issued-at and expiration are included. A supplied invalid Bearer token is rejected with `401 UNAUTHENTICATED`, even on public endpoints.
 - Every protected request checks role authorization and the user's active flag. Deactivated accounts cannot log in, and their existing JWTs stop working on their next request.
 
 ## Users and services
@@ -72,3 +75,4 @@ Out of scope for v1: password reset, email verification, refresh tokens, email/S
 - Self-registered residents are not verified against flat ownership.
 - Rate-limit counters are in memory and do not coordinate across instances.
 - Password reset and email verification are unavailable in v1.
+- JWTs cannot be revoked before they expire (no refresh tokens or blacklist in v1); deactivating a user blocks them immediately because the active flag is checked on every request.

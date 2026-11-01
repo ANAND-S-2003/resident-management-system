@@ -1,6 +1,6 @@
 # REST API contract
 
-This is the authoritative v1 contract. Base path: `/api/v1`. JSON uses `application/json`; dates are ISO `YYYY-MM-DD`; timestamps are UTC ISO-8601. JWT access tokens use HS256 and expire after 60 minutes; send as `Authorization: Bearer <token>`. Every authenticated request checks the user's active flag. Roles are exactly `USER`, `ADMIN`, and `SUPER_ADMIN`; `ADMIN+` means ADMIN or SUPER_ADMIN. No API creates or promotes SUPER_ADMIN.
+This is the authoritative v1 contract. Base path: `/api/v1`. JSON uses `application/json`; dates are ISO `YYYY-MM-DD`; timestamps are UTC ISO-8601. JWT access tokens use HS256, issuer `rms`, subject equal to the user ID, a role claim, issued-at and expiration claims, and expire after 60 minutes; send as `Authorization: Bearer <token>`. Every authenticated request checks the user's active flag and token role against the current database role. A supplied invalid Bearer token is rejected with `401 UNAUTHENTICATED`, even on public endpoints. Tokens cannot be revoked before expiry; there are no refresh tokens or token blacklist in v1. Roles are exactly `USER`, `ADMIN`, and `SUPER_ADMIN`; `ADMIN+` means ADMIN or SUPER_ADMIN. No API creates or promotes SUPER_ADMIN.
 
 All lists use `{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0}` and accept zero-based `page` (default 0), `size` (default 20, clamped to 1-100), and `sort=<field>,<asc|desc>`. Invalid sort field/direction returns `400 VALIDATION_ERROR`. Strings are trimmed before validation. No response includes a password or password hash. Passwords require at least 8 characters, at most 72 UTF-8 bytes, one letter and one digit. Invalid password message: "Password must be at least 8 characters, no more than 72 UTF-8 bytes, and include at least one letter and one digit."
 
@@ -39,11 +39,13 @@ Errors 400 `VALIDATION_ERROR`, 401 `INVALID_CREDENTIALS` (uniform for unknown em
 Response 200 `{id,fullName,email,role,flatNumber,active}`. Error 401 `UNAUTHENTICATED`.
 
 ### `POST /auth/change-password` - USER, ADMIN, SUPER_ADMIN
-Request `{currentPassword,newPassword}`; new password follows the shared rule.
+Request `{currentPassword,newPassword}`; new password follows the shared rule and must differ from the current password.
 Response 204, no body.
 Errors 400 `INVALID_CURRENT_PASSWORD` for wrong current password; 400 `VALIDATION_ERROR` for invalid new password; 401 `UNAUTHENTICATED`.
 
 The first SUPER_ADMIN is provisioned at startup from environment variables only when none exists; no API creates or promotes one.
+
+Registration and login passwords use BCrypt with strength 10. The shared password validation rule applies to registration and new passwords; login accepts the already-stored password without reapplying that policy. Passwords, tokens, and signing secrets are never logged.
 
 ## User administration
 

@@ -8,7 +8,9 @@
 - Return the documented consistent JSON errors and distinct codes. Do not expose stack traces or sensitive data.
 - Never store, log, or return plaintext passwords. Persist BCrypt hashes only.
 - JWT access tokens use HS256 and expire after 60 minutes. `RMS_JWT_SECRET` must be present and at least 32 bytes; fail fast otherwise. No refresh tokens in v1.
+- Use the shared `@ValidPassword` annotation for every request DTO that accepts a new password; count UTF-8 bytes for the 72-byte maximum.
 - Enforce server-side role authorization on protected endpoints and check the account active flag on every authenticated request.
+- A supplied invalid Bearer token is rejected with `401 UNAUTHENTICATED`, including on public endpoints. Never log passwords, tokens, or JWT signing secrets.
 - Bootstrap a SUPER_ADMIN from environment variables only when none exists. Never expose an API to create or promote a SUPER_ADMIN.
 - Soft-deactivate users and services. Never hard-delete records with history.
 - Render descriptions, remarks, and contact messages as plain text, never as HTML.

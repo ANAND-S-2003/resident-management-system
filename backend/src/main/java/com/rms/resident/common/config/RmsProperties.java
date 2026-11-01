@@ -4,6 +4,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import com.rms.resident.common.validation.PasswordPolicy;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -39,6 +40,9 @@ public record RmsProperties(
                 .filter(origin -> origin != null && !origin.isBlank())
                 .map(String::trim)
                 .toList();
+        if (corsAllowedOrigins.contains("*")) {
+            throw new IllegalArgumentException("RMS_CORS_ALLOWED_ORIGINS must list explicit origins; wildcard is not allowed");
+        }
     }
 
     @AssertTrue(message = "RMS_JWT_SECRET must be at least 32 UTF-8 bytes")
@@ -48,11 +52,14 @@ public record RmsProperties(
 
     @AssertTrue(message = "RMS_SUPERADMIN_PASSWORD must meet the documented password policy")
     public boolean isSuperadminPasswordValid() {
-        if (superadminPassword == null) return false;
-        int bytes = superadminPassword.getBytes(StandardCharsets.UTF_8).length;
-        return superadminPassword.codePointCount(0, superadminPassword.length()) >= 8 && bytes <= 72
-                && superadminPassword.matches("(?s).*\\p{L}.*")
-                && superadminPassword.matches("(?s).*\\p{N}.*");
+        return PasswordPolicy.isValid(superadminPassword);
+    }
+
+    @Override
+    public String toString() {
+        return "RmsProperties[jwtSecret=[REDACTED], superadminEmail=" + superadminEmail
+                + ", superadminName=" + superadminName + ", superadminPassword=[REDACTED], timezone="
+                + timezone + ", corsAllowedOrigins=" + corsAllowedOrigins + ", trustProxy=" + trustProxy + "]";
     }
 }
 

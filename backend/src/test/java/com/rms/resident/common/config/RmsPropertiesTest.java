@@ -68,6 +68,12 @@ class RmsPropertiesTest {
                 .run(context -> assertFailureMentions(context, "RMS_SUPERADMIN_EMAIL"));
     }
 
+    @Test
+    void failsWhenBootstrapPasswordViolatesPolicy() {
+        runner.withPropertyValues(replace(validProperties(), "rms.superadmin-password=Replace123", "rms.superadmin-password=weak"))
+                .run(context -> assertFailureMentions(context, "RMS_SUPERADMIN_PASSWORD"));
+    }
+
     private static String[] validProperties() {
         return new String[]{
                 "rms.jwt-secret=01234567890123456789012345678901",
