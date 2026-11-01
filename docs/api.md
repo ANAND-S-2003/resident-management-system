@@ -1,122 +1,181 @@
 # REST API contract
 
-Base path: `/api/v1`. JSON uses `application/json`; dates are ISO `YYYY-MM-DD`; timestamps are ISO-8601 UTC. JWT is sent as `Authorization: Bearer <token>`. Access JWTs use HS256 and expire after 60 minutes. Every authenticated request checks the current user's active flag. The only roles are `USER`, `ADMIN`, and `SUPER_ADMIN`; `ADMIN+` means ADMIN or SUPER_ADMIN. No endpoint creates/promotes a SUPER_ADMIN. All list endpoints accept `page` (zero-based, default 0) and `size` (default 20, maximum 100) and return a page envelope unless stated otherwise.
+This is the authoritative v1 contract. Base path: `/api/v1`. JSON uses `application/json`; dates are ISO `YYYY-MM-DD`; timestamps are UTC ISO-8601. JWT access tokens use HS256 and expire after 60 minutes; send as `Authorization: Bearer <token>`. Every authenticated request checks the user's active flag. Roles are exactly `USER`, `ADMIN`, and `SUPER_ADMIN`; `ADMIN+` means ADMIN or SUPER_ADMIN. No API creates or promotes SUPER_ADMIN.
 
-## Common response formats
+All lists use `{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0}` and accept zero-based `page` (default 0), `size` (default 20, maximum 100), and `sort=<field>,<asc|desc>`. Invalid sort field/direction returns `400 VALIDATION_ERROR`. Strings are trimmed before validation. No response includes a password or password hash. Passwords require at least 8 characters, at most 72 UTF-8 bytes, one letter and one digit. Invalid password message: "Password must be at least 8 characters, no more than 72 UTF-8 bytes, and include at least one letter and one digit."
 
-Lists use `{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0}`. Errors use `{"timestamp":"2026-01-01T00:00:00Z","status":400,"code":"VALIDATION_ERROR","message":"Request validation failed","path":"/api/v1/...","details":[{"field":"email","message":"must be valid"}]}`. No response includes a password or password hash.
+## Error codes
 
-Common errors: `400 VALIDATION_ERROR`; `401 UNAUTHENTICATED` for missing/invalid/expired JWT, invalid credentials, or inactive account; `403 FORBIDDEN`; `404 NOT_FOUND`; `409 CONFLICT` for duplicate email/name or invalid request transition; `429 TOO_MANY_REQUESTS` for rate limits; `500 INTERNAL_ERROR` with sanitized details only.
+| HTTP | Code | Meaning |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Invalid input or sort field/direction |
+| 400 | `INVALID_CURRENT_PASSWORD` | Current password did not match |
+| 401 | `UNAUTHENTICATED` | Missing, invalid, or expired token, or inactive account |
+| 401 | `INVALID_CREDENTIALS` | Login failure; same response for unknown email and wrong password |
+| 403 | `FORBIDDEN` | Caller lacks permission |
+| 404 | `NOT_FOUND` | Missing resource or concealed by ownership rules |
+| 409 | `DUPLICATE_RESOURCE` | Duplicate email or service name |
+| 409 | `INVALID_STATUS_TRANSITION` | Transition is not allowed |
+| 409 | `CONCURRENT_MODIFICATION` | Optimistic-lock version conflict |
+| 429 | `TOO_MANY_REQUESTS` | Rate limit; includes `Retry-After` seconds |
+| 500 | `INTERNAL_ERROR` | Sanitized unexpected server error |
 
-## Authentication and registration
+Every error body is `{"timestamp":"...","status":400,"code":"VALIDATION_ERROR","message":"...","path":"...","details":[{"field":"...","message":"..."}]}`. Details may be empty. Never include secrets, hashes, or stack traces.
 
-### `POST /auth/register` — Anonymous
-Request: `{ "fullName":"A Resident", "email":"resident@example.com", "password":"Resident123", "flatNumber":"A-101" }`. Password is 8–72 characters with at least one letter and one digit. Email is normalized lowercase. Role is always assigned as `USER`.
-Response `201`: `{ "id":1, "fullName":"A Resident", "email":"resident@example.com", "role":"USER", "flatNumber":"A-101", "active":true }`.
-Errors: 400 invalid fields/password policy; 409 email already registered.
+## Authentication
 
-### `POST /auth/login` — Anonymous
-Request: `{ "email":"resident@example.com", "password":"Resident123" }`.
-Response `200`: `{ "accessToken":"<jwt>", "tokenType":"Bearer", "expiresAt":"2026-01-01T01:00:00Z", "user":{ "id":1, "fullName":"A Resident", "email":"resident@example.com", "role":"USER", "flatNumber":"A-101" } }`.
-Errors: 400 malformed input; 401 invalid credentials or inactive account; 429 after 5 failed attempts per account and source IP in a rolling 15-minute window. No refresh token is issued. Credential failure does not reveal which field was incorrect.
+### `POST /auth/register` - Anonymous
+Request `{fullName,email,password,flatNumber}`. Role is always USER; email stored lowercase. Limits: fullName 2-120, email max 254, flatNumber 1-30 chars. Password follows the rule above.
+Response 201 `{id,fullName,email,role,flatNumber,active}`.
+Errors 400 `VALIDATION_ERROR`, 409 `DUPLICATE_RESOURCE`, 429 `TOO_MANY_REQUESTS` (10 requests/hour/IP; `Retry-After`).
 
-The initial SUPER_ADMIN is provisioned from startup environment variables only if no super admin exists; it is not created through this API.
+### `POST /auth/login` - Anonymous
+Request `{email,password}`. For unknown email, compare against a dummy BCrypt hash to keep response times similar.
+Response 200 `{accessToken,tokenType,expiresAt,user:{id,fullName,email,role,flatNumber}}`.
+Errors 400 `VALIDATION_ERROR`, 401 `INVALID_CREDENTIALS` (uniform for unknown email, wrong password, or inactive account), 429 `TOO_MANY_REQUESTS` (5 failed attempts per rolling 15 minutes keyed by client IP + lowercase email; success resets key; `Retry-After`).
+
+### `GET /auth/me` - USER, ADMIN, SUPER_ADMIN
+Response 200 `{id,fullName,email,role,flatNumber,active}`. Error 401 `UNAUTHENTICATED`.
+
+### `POST /auth/change-password` - USER, ADMIN, SUPER_ADMIN
+Request `{currentPassword,newPassword}`; new password follows the shared rule.
+Response 204, no body.
+Errors 400 `INVALID_CURRENT_PASSWORD` for wrong current password; 400 `VALIDATION_ERROR` for invalid new password; 401 `UNAUTHENTICATED`.
+
+The first SUPER_ADMIN is provisioned at startup from environment variables only when none exists; no API creates or promotes one.
 
 ## User administration
 
-### `GET /users` — ADMIN+
-Query: optional `role`, `active`; page parameters. ADMIN results are restricted to USER accounts; SUPER_ADMIN may view all roles. Response `200`: page of `{id,fullName,email,role,flatNumber,active,createdAt}`.
-Errors: common 400/401/403.
+ADMIN may manage USER accounts only. Accessing, editing, or deactivating a non-USER account as ADMIN returns 403 `FORBIDDEN`. SUPER_ADMIN may manage USER and ADMIN but neither role can create/promote SUPER_ADMIN.
 
-### `POST /users` — ADMIN+
-Request: `{ "fullName":"...", "email":"...", "password":"Resident123", "role":"USER", "flatNumber":"..." }`. ADMIN may create USER only; SUPER_ADMIN may create USER or ADMIN. Requests for role `SUPER_ADMIN` are always forbidden. Password policy is 8–72 characters with at least one letter and one digit.
-Response `201`: `{ "id":1, "fullName":"...", "email":"...", "role":"USER", "flatNumber":"...", "active":true }`.
-Errors: common 400/401/403/409.
+### `GET /users` - ADMIN, SUPER_ADMIN
+Query `q` case-insensitive contains on name or email; optional `role`, `active`; pagination. Sort whitelist: `createdAt`, `fullName`, `email`, `role`; default `createdAt,desc`. ADMIN sees USER only; a request to access non-USER accounts returns 403; SUPER_ADMIN may see all roles.
+Response 200 page of `{id,fullName,email,role,flatNumber,active,createdAt}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
-### `GET /users/{userId}` — ADMIN+ within management scope
-Response `200`: `{ "id":1, "fullName":"...", "email":"...", "role":"USER", "flatNumber":"...", "active":true, "createdAt":"...", "updatedAt":"..." }`.
-Errors: common 401/403/404. ADMIN may access USER accounts only; SUPER_ADMIN may access USER and ADMIN accounts.
+### `POST /users` - ADMIN, SUPER_ADMIN
+Request `{fullName,email,password,role,flatNumber}`. ADMIN may create USER only; SUPER_ADMIN may create USER or ADMIN. SUPER_ADMIN role is always forbidden. Apply user and password limits.
+Response 201 `{id,fullName,email,role,flatNumber,active}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 409 `DUPLICATE_RESOURCE`.
 
-### `PUT /users/{userId}` — ADMIN+ within management scope
-Request: `{ "fullName":"...", "email":"...", "flatNumber":"..." }`. Role is immutable; no API promotes users or creates a SUPER_ADMIN. Response `200`: public user object.
-Errors: common 400/401/403/404/409.
+### `GET /users/{userId}` - ADMIN, SUPER_ADMIN
+ADMIN may access USER only; SUPER_ADMIN may access USER and ADMIN.
+Response 200 `{id,fullName,email,role,flatNumber,active,createdAt,updatedAt}`.
+Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
-### `PATCH /users/{userId}/activation` — ADMIN+ within management scope
-Request: `{ "active":false }`. ADMIN can deactivate USER only; SUPER_ADMIN may deactivate USER or ADMIN. Reactivation uses `active:true`. Cannot deactivate the currently authenticated account. Deactivation prevents login and invalidates existing JWTs on their next authenticated use. Response `200`: public user object.
-Errors: common 400/401/403/404.
+### `PUT /users/{userId}` - ADMIN, SUPER_ADMIN
+Request `{fullName,email,flatNumber}`; role immutable. ADMIN may edit USER only; SUPER_ADMIN may edit USER or ADMIN.
+Response 200 `{id,fullName,email,role,flatNumber,active,createdAt,updatedAt}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, 409 `DUPLICATE_RESOURCE`.
 
-## Service catalog
+### `PATCH /users/{userId}/activation` - ADMIN, SUPER_ADMIN
+Request `{active:boolean}`. ADMIN may activate/deactivate USER only; SUPER_ADMIN may activate/deactivate USER or ADMIN. Cannot deactivate own account. Deactivation blocks login and existing JWTs on next request.
+Response 200 `{id,fullName,email,role,flatNumber,active}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
-### `GET /services` — USER, ADMIN, SUPER_ADMIN
-Query: optional `active` (defaults true for USER; ADMIN+ may request all); page parameters. Response `200`: page of `{id,name,description,active}`.
-Errors: common 400/401/403.
+## Services
 
-### `POST /services` — ADMIN+
-Request: `{ "name":"Plumbing", "description":"..." }`. Response `201`: `{ "id":1, "name":"Plumbing", "description":"...", "active":true }`.
-Errors: common 400/401/403/409 duplicate name.
+### `GET /services` - USER, ADMIN, SUPER_ADMIN
+Query `q` case-insensitive contains on name; optional `active`; pagination. Sort whitelist: `name`, `createdAt`; default `name,asc`. USER always sees active services; ignore `active` for USER. ADMIN+ may pass true/false or omit for all.
+Response 200 page of `{id,name,description,active}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
-### `GET /services/{serviceId}` — USER, ADMIN, SUPER_ADMIN
-Response `200`: `{ "id":1, "name":"Plumbing", "description":"...", "active":true }`.
-Errors: common 401/403/404.
+### `POST /services` - ADMIN, SUPER_ADMIN
+Request `{name,description}`; name 2-100 chars, description max 500.
+Response 201 `{id,name,description,active}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 409 `DUPLICATE_RESOURCE`.
 
-### `PUT /services/{serviceId}` — ADMIN+
-Request: `{ "name":"Plumbing", "description":"..." }`. Response `200`: service object.
-Errors: common 400/401/403/404/409.
+### `GET /services/{serviceId}` - USER, ADMIN, SUPER_ADMIN
+USER requesting inactive service gets 404 `NOT_FOUND`; ADMIN+ may view inactive services.
+Response 200 `{id,name,description,active}`.
+Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
-### `PATCH /services/{serviceId}/activation` — ADMIN+
-Request: `{ "active":false }`. Response `200`: service object. Services are deactivated rather than hard-deleted, including when referenced.
-Errors: common 400/401/403/404.
+### `PUT /services/{serviceId}` - ADMIN, SUPER_ADMIN
+Request `{name,description}`; limits as above.
+Response 200 `{id,name,description,active}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, 409 `DUPLICATE_RESOURCE`.
+
+### `PATCH /services/{serviceId}/activation` - ADMIN, SUPER_ADMIN
+Request `{active:boolean}`. Soft activation/deactivation only.
+Response 200 `{id,name,description,active}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
 ## Service requests
 
-### `GET /requests` — USER, ADMIN, SUPER_ADMIN
-Query: optional `status` (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `REJECTED`), `overdue` boolean; page parameters. USER results contain own requests only; ADMIN+ results include all residents. Response `200`: page of `{id,resident:{id,fullName},flatNumber,service:{id,name},description,requestDate,expectedCompletionDate,status,adminRemarks,overdue,createdAt,updatedAt}`. `overdue` is computed, never stored: expected completion date is before current date AND status is `PENDING` or `IN_PROGRESS`; `COMPLETED` and `REJECTED` are never overdue.
-Errors: common 400/401/403.
+All request responses contain `{id,resident:{id,fullName},flatNumber,service:{id,name},description,requestDate,expectedCompletionDate,status,adminRemarks,version,overdue,createdAt,updatedAt}`. `overdue` is computed, never stored: expected completion date is before current date in `RMS_TIMEZONE` AND status is `PENDING` or `IN_PROGRESS`; `COMPLETED` and `REJECTED` are never overdue. Request date and current date use `RMS_TIMEZONE` through one injectable `Clock`.
 
-### `POST /requests` — USER
-Request: `{ "serviceId":1, "description":"Leaking tap", "expectedCompletionDate":"2026-11-10" }`. Client sends neither resident/user ID, flat number, request date, nor status. Server derives resident and flat-number snapshot from the authenticated user's profile, sets request date to current date and status to `PENDING`.
-Response `201`: request object as above.
-Errors: common 400/401/403; 404 service missing or inactive. Expected completion date must be on or after server-assigned request date.
+### `GET /requests` - USER, ADMIN, SUPER_ADMIN
+Query optional status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `REJECTED`) and overdue boolean; ADMIN+ may pass `q`, case-insensitive contains on resident name or flat number. USER sees own requests only. `overdue=true` selects overdue; `false` selects non-overdue; omitted applies no overdue filter. Status and overdue combine with AND. Sort whitelist: `createdAt`, `requestDate`, `expectedCompletionDate`, `status`; default `createdAt,desc`.
+Response 200 page of request objects.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
-### `GET /requests/{requestId}` — USER, ADMIN, SUPER_ADMIN
-USER may access own request only; ADMIN+ may access all. Response `200`: request object as above.
-Errors: common 401/403/404. Another resident's request returns 404 to a USER.
+### `POST /requests` - USER
+Request `{serviceId,description,expectedCompletionDate}`. Description 5-1000 chars. Client sends no resident ID, flat number, request date, or status. Server derives resident and flat snapshot, sets request date using configured Clock and status `PENDING`. Expected date is on or after request date. Inactive services cannot be selected.
+Response 201 request object.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND` for missing/inactive service.
 
-### `PATCH /requests/{requestId}` — ADMIN+
-Request: `{ "status":"IN_PROGRESS", "adminRemarks":"Technician assigned" }`. At least one field is required. Allowed status transitions: `PENDING` → `IN_PROGRESS` or `REJECTED`; `IN_PROGRESS` → `COMPLETED` or `REJECTED`; `COMPLETED` and `REJECTED` are final. Setting `REJECTED` requires non-empty `adminRemarks`. Invalid transition returns `409 CONFLICT` with a clear message. On an actual status change, create an in-app notification for the resident. Response `200`: updated request object.
-Errors: common 400/401/403/404/409.
+### `GET /requests/{requestId}` - USER, ADMIN, SUPER_ADMIN
+USER may access own request only; ADMIN+ may access all. Another resident's request returns 404 to USER.
+Response 200 request object.
+Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
+
+### `PATCH /requests/{requestId}` - ADMIN, SUPER_ADMIN
+Request may include `status` and/or `adminRemarks`; at least one required. Remarks max 1000 chars. Allowed transitions: `PENDING` -> `IN_PROGRESS` or `REJECTED`; `IN_PROGRESS` -> `COMPLETED` or `REJECTED`; `COMPLETED` and `REJECTED` final. Setting REJECTED requires non-empty, non-blank remarks. Every actual status change inserts history and a resident notification in the same transaction as the update.
+Response 200 request object.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, 409 `INVALID_STATUS_TRANSITION` or `CONCURRENT_MODIFICATION`.
+
+### `GET /requests/{requestId}/history` - USER, ADMIN, SUPER_ADMIN
+Same visibility rules as `GET /requests/{requestId}`. Ordered oldest first; accepts `sort=createdAt,asc` only (default), the only allowed sort for history.
+Response 200 array of `{fromStatus,toStatus,changedBy:{id,fullName},remarks,createdAt}`; `fromStatus` null for initial entry.
+Errors 400 `VALIDATION_ERROR` for any other sort; 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
 ## Notifications
 
-### `GET /notifications` — USER
-Query: optional `unreadOnly`; page parameters. Response `200`: page of `{id,requestId,type,message,read,createdAt,readAt}` for current resident only. `type` is currently `REQUEST_STATUS_CHANGED`.
-Errors: common 400/401/403.
+### `GET /notifications` - USER
+Query optional `unreadOnly`; pagination. Sort whitelist: `createdAt`; default `createdAt,desc`. Caller sees own notifications only.
+Response 200 page of `{id,requestId,type,message,read,createdAt,readAt}`; type `REQUEST_STATUS_CHANGED`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
-### `PATCH /notifications/{notificationId}/read` — USER (owner only)
-Request: `{ "read":true }`. Response `200`: `{ "id":1, "read":true, "readAt":"..." }`.
-Errors: common 400/401/403/404. Another resident's notification returns 404.
+### `GET /notifications/unread-count` - USER
+Response 200 `{count}`. Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
+
+### `PATCH /notifications/{notificationId}/read` - USER
+Request `{read:true}`; caller may mark own notification only.
+Response 200 `{id,read,readAt}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
+
+### `PATCH /notifications/read-all` - USER
+Marks all caller's notifications read. Response 204, no body. Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
 ## Dashboard
 
-### `GET /dashboard/summary` — SUPER_ADMIN
-Response `200`: `{ "byStatus":{ "PENDING":0, "IN_PROGRESS":0, "COMPLETED":0, "REJECTED":0 }, "overdueCount":0 }`. Counts cover all requests; overdue is computed, never stored, using the same rule stated above.
-Errors: common 401/403.
+### `GET /dashboard/summary` - ADMIN, SUPER_ADMIN
+ADMIN response `{byStatus:{PENDING,IN_PROGRESS,COMPLETED,REJECTED},overdueCount,totalRequests,activeResidents}`. SUPER_ADMIN gets the same plus `activeAdmins`. `activeResidents` counts active USER accounts. Overdue follows the shared computed rule.
+Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
 ## Contact queries
 
-### `POST /contact-queries` — Anonymous, USER, ADMIN, SUPER_ADMIN
-Request: `{ "name":"A Visitor", "email":"visitor@example.com", "subject":"Question", "message":"..." }`. Email is stored lowercase. Authenticated submitter identity is associated when present; supplied contact fields remain explicit.
-Response `201`: `{ "id":1, "createdAt":"..." }`.
-Errors: 400 validation; 401 if a supplied bearer token is invalid; 429 after 5 anonymous submissions per source IP per hour.
+### `POST /contact-queries` - Anonymous, USER, ADMIN, SUPER_ADMIN
+Request `{name,email,subject,message}`; name 2-120, email max 254 and stored lowercase, subject 3-200, message 5-2000. Authenticated submitter is associated when available; fields remain explicit.
+Response 201 `{id,createdAt}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED` for invalid supplied token, 429 `TOO_MANY_REQUESTS` for anonymous submissions (5/hour/IP; includes `Retry-After`).
 
-### `GET /contact-queries` — ADMIN+
-Query: page parameters. Response `200`: page of `{id,submittedById,name,email,subject,message,createdAt}`.
-Errors: common 400/401/403.
+### `GET /contact-queries` - ADMIN, SUPER_ADMIN
+Pagination. Sort whitelist: `createdAt`; default `createdAt,desc`.
+Response 200 page of `{id,submittedById,name,email,subject,message,createdAt}`.
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 
-### `GET /contact-queries/{queryId}` — ADMIN+
-Response `200`: `{ "id":1, "submittedById":null, "name":"A Visitor", "email":"visitor@example.com", "subject":"Question", "message":"...", "createdAt":"..." }`.
-Errors: common 401/403/404.
+### `GET /contact-queries/{queryId}` - ADMIN, SUPER_ADMIN
+Response 200 `{id,submittedById,name,email,subject,message,createdAt}`.
+Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
-## Contract notes
+## Health
 
-Paths, pagination envelope, and HTTP methods are specified here as the proposed v1 contract. No physical delete endpoints exist. Token and bootstrap secrets are environment configuration and never returned by the API. Exact field limits are defined in the data model and backend validation.
+### `GET /actuator/health` - Anonymous
+Response 200 `{"status":"UP"}` or 503 `{"status":"DOWN"}` only; no details.
+
+## Rate limits, proxy, and CORS
+
+Counters are in-memory; v1 runs one instance. Login: 5 failed attempts per rolling 15 minutes keyed by socket client IP + lowercase email; success resets key. Registration: 10/hour/IP. Anonymous contact: 5/hour/IP. Every 429 has `Retry-After` seconds. Use socket IP unless `RMS_TRUST_PROXY=true`, when `X-Forwarded-For` is trusted. Multi-instance deployment requires shared counters such as Redis.
+
+CORS allowed origins come from comma-separated `RMS_CORS_ALLOWED_ORIGINS`. Allow only required methods and headers. Never use wildcard origins with credentials or authorization headers.

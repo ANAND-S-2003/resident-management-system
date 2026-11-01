@@ -2,63 +2,73 @@
 
 ## Purpose and roles
 
-RMS supports residential service requests. Residents submit and track requests; administrators manage the catalog and service operations; super administrators manage administrator accounts and have system-wide visibility. All accounts are rows in one `users` table with one role: `USER`, `ADMIN`, or `SUPER_ADMIN`.
+RMS supports residential service requests. Residents submit and track requests; admins manage the service catalog and requests; super admins manage admin accounts and see system-wide information. All accounts are in one `users` table with role `USER`, `ADMIN`, or `SUPER_ADMIN`.
 
-- Anyone may register an account as `USER`. Public registration cannot set a role.
-- `ADMIN` users may create, edit, and deactivate `USER` accounts only.
-- Only `SUPER_ADMIN` users may create, edit, and deactivate `ADMIN` accounts. A super admin may also manage USER accounts.
-- `SUPER_ADMIN` is created once at startup from environment variables (email, name, password) only when no super admin exists. No API registers or promotes an account to `SUPER_ADMIN`.
-- Login uses email and password. Emails are stored lowercase and unique. Passwords are BCrypt hashes; plaintext passwords never appear in API responses. Passwords must be 8–72 characters and contain at least one letter and one digit; the backend validates this.
-- JWT uses HS256 access tokens valid for 60 minutes. The signing secret is read from an environment variable, must be at least 32 bytes, and missing/short secrets cause startup failure. There are no refresh tokens in v1.
-- Every protected endpoint checks authorization on the server and checks the account's active flag on every request. Deactivated users cannot log in; their existing JWTs stop working.
+- Anyone may register only as `USER`. Public registration cannot set or override a role.
+- `ADMIN` may create, edit, and deactivate `USER` accounts only. Accessing, editing, or deactivating a non-USER account as ADMIN returns `403 FORBIDDEN`.
+- `SUPER_ADMIN` may create, edit, and deactivate `USER` and `ADMIN` accounts. No API creates or promotes an account to `SUPER_ADMIN`.
+- Create the initial `SUPER_ADMIN` at startup from environment variables only if one does not already exist.
+- Login is by lowercase email and password. Passwords are BCrypt hashes and never returned. Passwords require at least 8 characters, at most 72 UTF-8 bytes, one letter, and one digit; backend validation returns a clear message.
+- JWT access tokens use HS256, expire after 60 minutes, and use `RMS_JWT_SECRET` (minimum 32 bytes). No refresh tokens in v1. Missing/invalid required configuration fails startup.
+- Every protected request checks role authorization and the user's active flag. Deactivated accounts cannot log in, and their existing JWTs stop working on their next request.
 
 ## Users and services
 
-`flat_number` is required for USER profiles and null for ADMIN and SUPER_ADMIN. Admins manage the service catalog (for example Plumbing, Electrical, Cleaning, Painting, Internet Repair). Services have an active flag. Deactivate rather than delete users or services; records with history are never hard-deleted. Existing requests retain their service reference and displayable service name when a service is deactivated.
+`flat_number` is required for USER profiles and null for ADMIN and SUPER_ADMIN. User and service deactivation is soft; no record with history is hard-deleted. Existing requests keep their service reference and displayable name when a service becomes inactive. A Flyway migration seeds five active services: Plumbing, Electrical, Cleaning, Painting, and Internet Repair. It seeds no users. A separate `demo` profile with sample data will be added later for screenshots and must never run in production.
 
-## Service requests
+## Requests and status
 
-A request records the resident, a copy of the resident's flat number at creation, service, description, request date, expected completion date, status, and admin remarks. The request date is assigned by the server at creation and is never accepted from a client. The client does not send a resident/user ID; the server uses the authenticated USER. Expected completion date must be on or after request date.
+A request has resident, flat number snapshot, service, description, request date, expected completion date, status, and admin remarks. Only an authenticated USER can create one; the server derives resident and flat number from that user's profile. The server sets request date at creation; clients never send a user ID, flat number, request date, or status. Expected completion date must be on or after request date.
 
-Status is exactly one of `PENDING`, `IN_PROGRESS`, `COMPLETED`, or `REJECTED`. Backend-enforced transitions are:
+Statuses are exactly `PENDING`, `IN_PROGRESS`, `COMPLETED`, and `REJECTED`. Allowed transitions are `PENDING` -> `IN_PROGRESS` or `REJECTED`; `IN_PROGRESS` -> `COMPLETED` or `REJECTED`. `COMPLETED` and `REJECTED` are final. Invalid transitions return `409 INVALID_STATUS_TRANSITION` with a clear message. Setting `REJECTED` requires non-empty, non-blank admin remarks.
 
-- `PENDING` → `IN_PROGRESS` or `REJECTED`
-- `IN_PROGRESS` → `COMPLETED` or `REJECTED`
-- `COMPLETED` and `REJECTED` are final
+A request is overdue exactly when expected completion date is before the current date in `RMS_TIMEZONE` and status is `PENDING` or `IN_PROGRESS`. Overdue is computed, never stored. `COMPLETED` and `REJECTED` requests are never overdue. Request date and overdue's current date use the same configured zone and one injectable `Clock`; `RMS_TIMEZONE` defaults to `Asia/Kolkata`.
 
-An invalid transition returns HTTP 409 with a clear message. Setting status to `REJECTED` requires non-empty admin remarks.
+Every request creation adds history from NULL to `PENDING`, changed by the resident. Every actual status change adds a history row in the same transaction as the request update. Concurrent updates return `409 CONCURRENT_MODIFICATION`.
 
-A request is overdue exactly when its expected completion date is before the current date and its status is `PENDING` or `IN_PROGRESS`. Overdue is computed at read time and never stored. `COMPLETED` and `REJECTED` requests are never overdue.
-
-Residents can create and view their own requests. Admins manage requests across residents. Super admins can view all requests and dashboard information. Lists are paginated and requests can be filtered by status.
+Residents can view only their requests; ADMIN and SUPER_ADMIN can view all. Request lists support status, overdue, and (for ADMIN+) resident-name/flat-number search. `overdue=true` includes only overdue, `overdue=false` only non-overdue, and omitted means no overdue filter. Status and overdue filters combine using AND.
 
 ## Notifications and dashboard
 
-When an admin changes a request's status, the resident receives an in-app notification. Residents can list their notifications and mark them as read. The super-admin dashboard shows counts by each status and the overdue count.
+When an ADMIN or SUPER_ADMIN changes a request status, the resident receives an in-app notification. Residents can list notifications, get unread count, mark one read, or mark all their notifications read. ADMIN and SUPER_ADMIN can view dashboard summary; SUPER_ADMIN also receives active admin count. Dashboard includes counts by status, overdue count, total requests, and active residents.
 
-## Contact and rate limits
+## Contact and rate limiting
 
-An anonymous or logged-in visitor can submit a contact query; admins can list and view queries. Planned rate limits (implementation deferred): login is limited to 5 failed attempts per account and source IP in a rolling 15-minute window; anonymous contact submissions are limited to 5 per source IP per hour. Exceeding a limit returns HTTP 429. The exact counting/storage mechanism will be selected during implementation.
+Anonymous or authenticated visitors may submit contact queries; ADMIN and SUPER_ADMIN can list and view them. Rate limits use in-memory counters in v1, which runs as one instance. Login: 5 failed attempts per rolling 15 minutes per client IP + lowercase email; success resets that key. Registration: 10 requests per hour per IP. Anonymous contact: 5 per hour per IP. Every 429 includes `Retry-After` seconds. Client IP is the socket address, using `X-Forwarded-For` only when `RMS_TRUST_PROXY=true`. Multi-instance deployment requires shared counters such as Redis.
 
-## Non-functional requirements
+## Security and non-functional requirements
 
-- Validate all input on the backend.
-- Paginate list endpoints.
-- Use a consistent JSON error format.
-- Never expose plaintext passwords or password hashes in API responses.
-- Use environment variables for secrets and deployment-specific configuration; fail fast for missing required JWT/bootstrap configuration.
+- Validate all input on the backend; trim strings before validating limits. See Field limits below.
+- Paginate lists and whitelist sort fields per endpoint; unsupported sort fields return 400.
+- Return consistent JSON errors and exact distinct codes listed in `docs/api.md`.
+- Never expose plaintext passwords or hashes. Login for unknown email performs BCrypt comparison with a dummy hash and returns the same `INVALID_CREDENTIALS` response as other login failures.
+- CORS origins come from `RMS_CORS_ALLOWED_ORIGINS` (comma-separated). Allow only required methods and headers; no wildcard with credentials or authorization headers.
+- Render user-supplied descriptions, remarks, and contact messages as plain text, never HTML.
+- Set JDBC connection and Hibernate time zones to UTC. Business date calculations use `RMS_TIMEZONE` and the injectable `Clock`.
 
-## Future work (out of scope for v1)
+## Field limits
 
-- Password reset
-- Email verification
-- Refresh tokens
-- Email/SMS notifications
-- WebSocket push
+Trim all strings before validation. Limits count Unicode characters except passwords, whose maximum is 72 UTF-8 bytes.
 
-## Other implementation assumptions
+| Field | Limit |
+|---|---|
+| full_name | 2-120 characters |
+| email | maximum 254 characters |
+| flat_number | 1-30 characters |
+| service name | 2-100 characters |
+| service description | maximum 500 characters |
+| request description | 5-1000 characters |
+| admin_remarks | maximum 1000 characters; required and non-blank when setting `REJECTED` |
+| contact name | 2-120 characters |
+| contact subject | 3-200 characters |
+| contact message | 5-2000 characters |
 
-- Flat numbers are not globally unique; no building/household table is introduced in v1.
-- Request dates and expected completion dates are calendar dates (`DATE`); overdue uses the server's current date.
-- Service names are unique. Public login failure does not distinguish an unknown email, bad password, or inactive account.
-- Notification retention, contact-query response workflow, and audit history are not specified. No hard-delete operations are provided for records with history.
+## Future work
+
+Out of scope for v1: password reset, email verification, refresh tokens, email/SMS notifications, and WebSocket push. A separate demo profile for screenshot data is also future work and never runs in production.
+
+## Known limitations
+
+- Self-registered residents are not verified against flat ownership.
+- Rate-limit counters are in memory and do not coordinate across instances.
+- Password reset and email verification are unavailable in v1.

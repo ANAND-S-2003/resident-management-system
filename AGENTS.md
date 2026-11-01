@@ -1,15 +1,17 @@
 # Engineering rules
 
-- Keep commits small and focused. Use clear commit messages that describe one coherent change.
-- Every feature ships with appropriate automated tests (backend, frontend, and/or BDD coverage as applicable).
-- Never commit secrets or credentials. Read configuration from environment variables; document required variables in a `.env.example` file. Never put real credentials in that example.
-- Define roles, request statuses, and other shared fixed identifiers/strings once in shared enums or constants. Do not hardcode IDs, roles, or status strings elsewhere.
-- Validate all input on the backend, including path/query parameters and request bodies. Passwords must be 8–72 characters and contain at least one letter and one digit.
-- Return consistent JSON error responses across the API. Do not expose stack traces or sensitive data to clients.
-- Never store, log, or return plaintext passwords. Persist passwords using BCrypt hashes.
-- JWT access tokens use HS256 and expire after 60 minutes. Read the signing secret from an environment variable; fail fast at startup when missing or shorter than 32 bytes. Do not issue refresh tokens in v1.
-- Enforce authentication and role-based authorization on the server for every protected endpoint. Check the user's active flag on every authenticated request so deactivation invalidates existing JWTs.
-- A SUPER_ADMIN is bootstrapped once at startup from environment variables only if none exists. Never expose an API to create or promote a user to SUPER_ADMIN.
-- Use soft deactivation for users and services. Do not hard-delete records with history.
-- For each task, run the relevant build and tests and report their results honestly, including failures. Do not claim checks ran when they did not.
-- Preserve the documented requirements and schema/API contracts. Update relevant docs when a design decision changes.
+- Keep commits small and focused. Use clear commit messages for coherent changes.
+- Every feature ships with appropriate automated tests (backend, frontend, and/or BDD as applicable).
+- Never commit secrets. Read them from environment variables and document required variables in `.env.example` using dummy values only.
+- Define roles, request statuses, and other fixed identifiers once in shared enums/constants. Do not hardcode IDs, roles, or status strings elsewhere.
+- Validate all input on the backend. Trim strings before validating documented limits. Passwords: at least 8 characters, at most 72 UTF-8 bytes, at least one letter and one digit.
+- Return the documented consistent JSON errors and distinct codes. Do not expose stack traces or sensitive data.
+- Never store, log, or return plaintext passwords. Persist BCrypt hashes only.
+- JWT access tokens use HS256 and expire after 60 minutes. `RMS_JWT_SECRET` must be present and at least 32 bytes; fail fast otherwise. No refresh tokens in v1.
+- Enforce server-side role authorization on protected endpoints and check the account active flag on every authenticated request.
+- Bootstrap a SUPER_ADMIN from environment variables only when none exists. Never expose an API to create or promote a SUPER_ADMIN.
+- Soft-deactivate users and services. Never hard-delete records with history.
+- Render descriptions, remarks, and contact messages as plain text, never as HTML.
+- Use `RMS_TIMEZONE` and one injectable `Clock` for request dates and overdue checks. Configure JDBC and Hibernate to UTC.
+- After each task, run the relevant build and tests and report results honestly, including failures.
+- Keep requirements, data model, and authoritative v1 API contract consistent; update docs when decisions change.
