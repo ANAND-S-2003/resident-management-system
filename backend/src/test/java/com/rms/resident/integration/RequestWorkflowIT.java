@@ -19,21 +19,37 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.ResultHandler;
+import org.springframework.test.web.servlet.ResultMatcher;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestPropertySource(properties = {
+        "logging.level.org.hibernate.SQL=DEBUG",
+        "logging.level.org.hibernate.orm.jdbc.bind=TRACE"
+})
 class RequestWorkflowIT {
+    private static final AtomicInteger FLAT_SEQUENCE = new AtomicInteger();
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) { SharedMySqlContainer.registerProperties(registry); }
-    @Autowired MockMvc mvc; @Autowired ObjectMapper mapper; @Autowired UserAccountRepository users;
+    @Autowired MockMvc rawMvc; private final Map<String,Role> tokenRoles=new ConcurrentHashMap<>();
+    private final ContextualMvc mvc=new ContextualMvc();
+    @Autowired ObjectMapper mapper; @Autowired UserAccountRepository users;
     @Autowired ServiceItemRepository services; @Autowired ServiceRequestRepository requests;
     @Autowired RequestStatusHistoryRepository history; @Autowired ResidentNotificationRepository notifications;
     @Autowired PasswordEncoder encoder; @Autowired JwtService jwt; @Autowired Clock clock;
@@ -163,16 +179,17 @@ class RequestWorkflowIT {
 
     @Test void requestSearchUsesLiteralWildcardsAndCombinesFiltersAndPagination() throws Exception {
         var resident=user(Role.USER); var admin=user(Role.ADMIN); var service=service(admin);
-        resident.updateProfile("Pipe% Owner 50",resident.getEmail(),"A_%FLAT",clock.instant()); users.saveAndFlush(resident);
+        String marker=UUID.randomUUID().toString().substring(0,8);
+        resident.updateProfile("Pipe-"+marker+"% Owner",resident.getEmail(),"A_"+marker+"FLAT",clock.instant()); users.saveAndFlush(resident);
         var first=request(resident,service,RequestStatus.PENDING,LocalDate.now(clock).plusDays(1));
         var second=request(resident,service,RequestStatus.PENDING,LocalDate.now(clock).plusDays(2));
         String path="/api/v1/requests";
-        mvc.perform(get(path).param("q","%").header("Authorization",bearer(admin)))
+        mvc.perform(get(path).param("q",marker+"%").header("Authorization",bearer(admin)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
-        mvc.perform(get(path).param("q","_").param("status",RequestStatus.PENDING.name()).param("page","0").param("size","1")
+        mvc.perform(get(path).param("q","_"+marker).param("status",RequestStatus.PENDING.name()).param("page","0").param("size","1")
                 .header("Authorization",bearer(admin))).andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.totalElements").value(2));
-        mvc.perform(get(path).param("q","%").param("status",RequestStatus.COMPLETED.name()).header("Authorization",bearer(admin)))
+        mvc.perform(get(path).param("q",marker+"%").param("status",RequestStatus.COMPLETED.name()).header("Authorization",bearer(admin)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         mvc.perform(get(path).param("sort","residentId,asc").header("Authorization",bearer(admin)))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -206,31 +223,70 @@ class RequestWorkflowIT {
     @Test void concurrentStatusUpdatesProduceOneHistoryEntryAndOneNotification() throws Exception {
         var resident=user(Role.USER); var firstAdmin=user(Role.ADMIN); var secondAdmin=user(Role.ADMIN); var service=service(firstAdmin);
         var request=request(resident,service,RequestStatus.PENDING,LocalDate.now(clock).plusDays(1));
-        String path="/api/v1/requests/"+request.getId(); var start=new CountDownLatch(1);
+        String path="/api/v1/requests/"+request.getId(); var ready=new CountDownLatch(2); var start=new CountDownLatch(1);
         var pool=Executors.newFixedThreadPool(2);
         try {
-            Callable<Integer> updateOne=()->{start.await();return mvc.perform(patch(path).header("Authorization",bearer(firstAdmin))
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"IN_PROGRESS\"}")).andReturn().getResponse().getStatus();};
-            Callable<Integer> updateTwo=()->{start.await();return mvc.perform(patch(path).header("Authorization",bearer(secondAdmin))
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"IN_PROGRESS\"}")).andReturn().getResponse().getStatus();};
-            var one=pool.submit(updateOne); var two=pool.submit(updateTwo); start.countDown();
-            var statuses=List.of(one.get(30,TimeUnit.SECONDS),two.get(30,TimeUnit.SECONDS));
-            assertThat(statuses).containsExactlyInAnyOrder(200,409);
+            String firstToken=bearer(firstAdmin), secondToken=bearer(secondAdmin);
+            Callable<org.springframework.test.web.servlet.MvcResult> updateOne=()->{ready.countDown();start.await();return mvc.perform(patch(path).header("Authorization",firstToken)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"IN_PROGRESS\"}")).andReturn();};
+            Callable<org.springframework.test.web.servlet.MvcResult> updateTwo=()->{ready.countDown();start.await();return mvc.perform(patch(path).header("Authorization",secondToken)
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"IN_PROGRESS\"}")).andReturn();};
+            var one=pool.submit(updateOne); var two=pool.submit(updateTwo);
+            assertThat(ready.await(10,TimeUnit.SECONDS)).as("Both concurrent request workers must be ready").isTrue();
+            start.countDown();
+            var results=List.of(one.get(30,TimeUnit.SECONDS),two.get(30,TimeUnit.SECONDS));
+            var statuses=results.stream().map(result->result.getResponse().getStatus()).toList();
+            var bodies=results.stream().map(result->{try{return result.getResponse().getContentAsString();}catch(Exception ex){return "<unreadable response>";}}).toList();
+            assertThat(statuses).withFailMessage("path=%s params={status=IN_PROGRESS} actors={ADMIN,ADMIN} responseBodies=%s",path,bodies)
+                    .containsExactlyInAnyOrder(200,409);
         } finally { pool.shutdownNow(); }
         assertThat(history.findByRequestIdOrderByCreatedAtAscIdAsc(request.getId())).hasSize(2);
         assertThat(notifications.findAll()).filteredOn(n->n.getRequestId().equals(request.getId())).hasSize(1);
     }
 
-    private UserAccount user(Role role){String tag=UUID.randomUUID().toString();return users.saveAndFlush(UserAccount.create("Workflow "+role,tag+"@example.test",encoder.encode("Password123"),role,role==Role.USER?"FLAT-"+tag:null,clock.instant()));}
-    private ServiceItem service(UserAccount admin){return services.saveAndFlush(ServiceItem.create("Test service "+UUID.randomUUID(),"desc",admin.getId(),clock.instant()));}
+    private UserAccount user(Role role){String tag=UUID.randomUUID().toString(); String fullName="Workflow "+role; String email=tag+"@example.test";
+        String flat=role==Role.USER?"T-"+Integer.toHexString(FLAT_SEQUENCE.incrementAndGet()):null;
+        requireMax("fullName",fullName,120); requireMax("email",email,254); if(flat!=null) requireMax("flatNumber",flat,12);
+        return users.saveAndFlush(UserAccount.create(fullName,email,encoder.encode("Password123"),role,flat,clock.instant()));}
+    private ServiceItem service(UserAccount admin){String name="Test service "+UUID.randomUUID(); requireMax("service.name",name,100);
+        return services.saveAndFlush(ServiceItem.create(name,"desc",admin.getId(),clock.instant()));}
     private com.rms.resident.request.ServiceRequest request(UserAccount resident,ServiceItem service,RequestStatus status,LocalDate expected){
-        var req=com.rms.resident.request.ServiceRequest.create(resident.getId(),resident.getFlatNumber(),service.getId(),"Request description",LocalDate.now(clock).minusDays(1),expected,clock.instant());
+        String description="Request description"; requireMax("service_requests.description",description,1000);
+        if(resident.getFlatNumber()!=null) requireMax("service_requests.flat_number",resident.getFlatNumber(),30);
+        var req=com.rms.resident.request.ServiceRequest.create(resident.getId(),resident.getFlatNumber(),service.getId(),description,LocalDate.now(clock).minusDays(1),expected,clock.instant());
         if(status!=RequestStatus.PENDING) req.changeStatus(status,null,clock.instant());
         req=requests.saveAndFlush(req);
         history.saveAndFlush(com.rms.resident.request.RequestStatusHistory.create(req.getId(),null,RequestStatus.PENDING,resident.getId(),null,clock.instant()));
         return req;
     }
-    private String bearer(UserAccount user){return "Bearer "+jwt.issue(user).value();}
+    private String bearer(UserAccount user){String token=jwt.issue(user).value();tokenRoles.put(token,user.getRole());return "Bearer "+token;}
+    private void requireMax(String field,String value,int max){assertThat(value.codePointCount(0,value.length())).as("Generated %s must not exceed schema limit %s: %s",field,max,value).isLessThanOrEqualTo(max);}
+    private final class ContextualMvc {
+        ResultActions perform(MockHttpServletRequestBuilder builder) throws Exception {
+            return new ContextualResultActions(rawMvc.perform(builder).andReturn());
+        }
+    }
+    private final class ContextualResultActions implements ResultActions {
+        private final MvcResult result;
+        private ContextualResultActions(MvcResult result){this.result=result;}
+        @Override public ResultActions andExpect(ResultMatcher matcher) throws Exception {
+            try { matcher.match(result); }
+            catch (Throwable failure) {
+                String header=result.getRequest().getHeader("Authorization");
+                String token=header!=null&&header.startsWith("Bearer ")?header.substring(7):null;
+                Role actor=token==null?null:tokenRoles.get(token);
+                String params=result.getRequest().getQueryString();
+                String requestBody=new String(result.getRequest().getContentAsByteArray(),java.nio.charset.StandardCharsets.UTF_8);
+                String responseBody=result.getResponse().getContentAsString();
+                throw new AssertionError("Request assertion failed: path="+result.getRequest().getMethod()+" "+result.getRequest().getRequestURI()
+                        +" params="+(params==null?"{}":params)+" actorRole="+(actor==null?"ANONYMOUS":actor)
+                        +" requestBody="+requestBody+" responseBody="+responseBody,failure);
+            }
+            return this;
+        }
+        @Override public ResultActions andDo(ResultHandler handler) throws Exception { handler.handle(result); return this; }
+        @Override public MvcResult andReturn(){return result;}
+    }
     private String createJson(Long serviceId,String description,LocalDate expected){return "{\"serviceId\":"+serviceId+
             ",\"description\":\""+description+"\",\"expectedCompletionDate\":\""+expected+"\"}";}
 }
