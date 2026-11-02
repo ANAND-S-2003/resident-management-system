@@ -1,10 +1,10 @@
 # Resident Management System
 
-Foundation monorepo for RMS, a role-based residential community service-request application.
+Resident Management System (RMS), a role-based residential community service-request application. The backend v1 API is complete; see the [authoritative API contract](docs/api.md).
 
 ## Planned stack
 
-- Backend: Java 17, Spring Boot 3.x, Maven 3.9+, Spring Data JPA, Flyway, MySQL 8.4 LTS; Spring Security/JWT is planned for a later step
+- Backend: Java 17, Spring Boot 3.x, Maven 3.9+, Spring Security/JWT, Spring Data JPA, Flyway, MySQL 8.4 LTS
 - Frontend: React, Vite, React Router, Axios; Node.js 22 and npm
 - Tests: JUnit 5/Testcontainers, Vitest/React Testing Library, Cucumber
 - Packaging and CI: Docker Desktop, Docker Compose, GitHub Actions

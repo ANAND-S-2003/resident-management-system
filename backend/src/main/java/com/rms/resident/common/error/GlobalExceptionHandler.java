@@ -39,7 +39,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiErrorResponse> handleApiException(ApiException ex, HttpServletRequest request) {
-        return response(ex.errorCode(), ex.getMessage(), request, ex.details());
+        ResponseEntity<ApiErrorResponse> response = response(ex.errorCode(), ex.getMessage(), request, ex.details());
+        if (ex.retryAfterSeconds() != null) {
+            return ResponseEntity.status(ex.errorCode().httpStatus()).header("Retry-After", ex.retryAfterSeconds().toString())
+                    .body(response.getBody());
+        }
+        return response;
     }
 
     @ExceptionHandler(AccessDeniedException.class)

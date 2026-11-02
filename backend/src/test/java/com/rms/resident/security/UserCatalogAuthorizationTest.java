@@ -29,7 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         com.rms.resident.user.UserAdministrationController.class,
         com.rms.resident.catalog.ServiceCatalogController.class,
         com.rms.resident.request.RequestController.class,
-        com.rms.resident.notification.NotificationController.class
+        com.rms.resident.notification.NotificationController.class,
+        com.rms.resident.dashboard.DashboardController.class,
+        com.rms.resident.contact.ContactQueryController.class
 })
 @Import({SecurityConfiguration.class, SecurityErrorWriter.class, ApiAuthenticationEntryPoint.class,
         ApiAccessDeniedHandler.class, UserCatalogAuthorizationTest.TestBeans.class})
@@ -41,6 +43,8 @@ class UserCatalogAuthorizationTest {
     @MockBean ServiceCatalogService serviceCatalog;
     @MockBean com.rms.resident.request.RequestService requestService;
     @MockBean com.rms.resident.notification.NotificationService notificationService;
+    @MockBean com.rms.resident.dashboard.DashboardService dashboardService;
+    @MockBean com.rms.resident.contact.ContactQueryService contactQueryService;
 
     @Test void authorizationPrecedesRequiredBodyValidationOnAllAdminRoutes() throws Exception {
         assertDeniedBeforeValidation(null, 401);
@@ -61,6 +65,26 @@ class UserCatalogAuthorizationTest {
                     .with(user("admin").authorities(new SimpleGrantedAuthority(role))))
                     .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
         }
+    }
+
+    @Test void dashboardAndContactAuthorizationAndPublicValidationAreCorrect() throws Exception {
+        for (String path : List.of("/api/v1/dashboard/summary", "/api/v1/contact-queries", "/api/v1/contact-queries/1")) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path))
+                    .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                    .with(user("resident").authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
+        mvc.perform(post("/api/v1/contact-queries").contentType("application/json").content(""))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        mvc.perform(post("/api/v1/contact-queries").contentType("application/json").content(
+                "{\"name\":\"Valid Name\",\"email\":\"valid@example.test\",\"subject\":\"Help\",\"message\":\"Valid message text\",\"submittedBy\":42}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        org.mockito.Mockito.when(jwtService.parse("invalid-token"))
+                .thenThrow(new io.jsonwebtoken.MalformedJwtException("invalid"));
+        mvc.perform(post("/api/v1/contact-queries").header("Authorization", "Bearer invalid-token")
+                .contentType("application/json").content("{\"name\":\"Test Name\",\"email\":\"test@example.test\",\"subject\":\"Help\",\"message\":\"Contact message\"}"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
 
     private void assertDeniedBeforeValidation(String authority, int expectedStatus) throws Exception {

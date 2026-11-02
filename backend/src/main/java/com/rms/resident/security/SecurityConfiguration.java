@@ -73,6 +73,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
                                 "/api/v1/contact-queries").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/dashboard/**", "/api/v1/contact-queries", "/api/v1/contact-queries/**")
+                                .hasAnyAuthority(com.rms.resident.common.enums.Role.ADMIN_AUTHORITY,
+                                        com.rms.resident.common.enums.Role.SUPER_ADMIN_AUTHORITY)
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").denyAll()
                         .requestMatchers("/api/v1/users", "/api/v1/users/**").hasAnyAuthority(

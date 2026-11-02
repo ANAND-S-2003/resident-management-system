@@ -39,7 +39,7 @@ When an ADMIN or SUPER_ADMIN changes a request status, the resident receives an 
 
 ## Contact and rate limiting
 
-Anonymous or authenticated visitors may submit contact queries; ADMIN and SUPER_ADMIN can list and view them. Rate limits use in-memory counters in v1, which runs as one instance. Login: 5 failed attempts per rolling 15 minutes per client IP + lowercase email; success resets that key. Registration: 10 requests per hour per IP. Anonymous contact: 5 per hour per IP. Every 429 includes `Retry-After` seconds. Client IP is the socket address, using `X-Forwarded-For` only when `RMS_TRUST_PROXY=true`. Multi-instance deployment requires shared counters such as Redis.
+Anonymous or authenticated visitors may submit contact queries; ADMIN and SUPER_ADMIN can list and view them. Only anonymous contact submissions that pass validation count toward the 5 per hour per IP limit; authenticated submissions are not counted. Rate limits use in-memory counters in v1, which runs as one instance. Login: 5 failed attempts per rolling 15 minutes per client IP + lowercase email; success resets that key. Registration: 10 requests per hour per IP. Every 429 includes `Retry-After` seconds. Client IP is the socket address, using `X-Forwarded-For` only when `RMS_TRUST_PROXY=true`. Multi-instance deployment requires shared counters such as Redis.
 
 ## Security and non-functional requirements
 

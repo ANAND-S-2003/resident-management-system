@@ -19,4 +19,9 @@ public class RateLimiterConfiguration {
     RateLimiter registerRateLimiter(Clock clock) {
         return new RateLimiter(clock, MAX_TRACKED_KEYS, 10, Duration.ofHours(1));
     }
+
+    @Bean("contactRateLimiter")
+    RateLimiter contactRateLimiter(Clock clock) {
+        return new RateLimiter(clock, MAX_TRACKED_KEYS, 5, Duration.ofHours(1));
+    }
 }

@@ -28,4 +28,12 @@ public class ContactQuery {
     private Instant createdAt;
 
     protected ContactQuery() {}
+
+    public static ContactQuery create(Long submittedBy,String name,String email,String subject,String message,Instant createdAt) {
+        ContactQuery query=new ContactQuery(); query.submittedBy=submittedBy; query.name=name; query.email=email;
+        query.subject=subject; query.message=message; query.createdAt=createdAt; return query;
+    }
+    public Long getId(){return id;} public Long getSubmittedBy(){return submittedBy;} public String getName(){return name;}
+    public String getEmail(){return email;} public String getSubject(){return subject;} public String getMessage(){return message;}
+    public Instant getCreatedAt(){return createdAt;}
 }

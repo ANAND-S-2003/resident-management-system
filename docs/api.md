@@ -162,7 +162,7 @@ Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`.
 ### `POST /contact-queries` - Anonymous, USER, ADMIN, SUPER_ADMIN
 Request `{name,email,subject,message}`; name 2-120, email max 254 and stored lowercase, subject 3-200, message 5-2000. Authenticated submitter is associated when available; fields remain explicit.
 Response 201 `{id,createdAt}`.
-Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED` for invalid supplied token, 429 `TOO_MANY_REQUESTS` for anonymous submissions (5/hour/IP; includes `Retry-After`).
+Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED` for invalid supplied token, 429 `TOO_MANY_REQUESTS` for anonymous submissions (5/hour/IP; includes `Retry-After`). Only anonymous submissions that pass request validation consume the rate limit; authenticated submissions are not counted.
 
 ### `GET /contact-queries` - ADMIN, SUPER_ADMIN
 Pagination. Sort whitelist: `createdAt`; default `createdAt,desc`.

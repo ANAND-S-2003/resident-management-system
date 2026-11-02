@@ -24,7 +24,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
 import static com.rms.resident.request.RequestDtos.*;
-import static org.springframework.data.jpa.domain.Specification.where;
 
 @Service
 public class RequestService {
@@ -63,10 +62,7 @@ public class RequestService {
         if(actor.role()==Role.USER) spec=spec.and((root,query,cb)->cb.equal(root.get("residentId"),actor.id()));
         if(status!=null) spec=spec.and((root,query,cb)->cb.equal(root.get("status"),status));
         if(overdue!=null) {
-            OverdueRule.Condition condition=OverdueRule.today(clock);
-            Specification<ServiceRequest> overdueSpec=(root,query,cb)->cb.and(
-                    cb.lessThan(root.<LocalDate>get("expectedCompletionDate"),condition.today()),
-                    root.get("status").in(condition.openStatuses()));
+            Specification<ServiceRequest> overdueSpec=RequestSpecifications.overdue(OverdueRule.today(clock));
             spec=spec.and(overdue ? overdueSpec : Specification.not(overdueSpec));
         }
         if(actor.role()!=Role.USER && q!=null && !q.isBlank()) {
