@@ -44,6 +44,14 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 Stop the application with Ctrl+C in Window 1, then run `docker compose down` from the repository root. Database data stays in the Docker volume unless you run `docker compose down -v`. Anonymous contact submissions are rate-limited to five per hour per client IP, so repeated smoke runs from the same IP can hit the documented limit until its rolling window expires.
 
+To check the HTTP helper without Docker or a running backend, run this local fake-server self-test from the repository root:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test.selftest.ps1
+```
+
+If PowerShell 7 is installed, you can also run `pwsh -NoProfile -File scripts/smoke-test.selftest.ps1`.
+
 ## Backend verification
 
 From `backend/`, run `mvn clean verify` for the full suite, or `mvn clean verify -Dit.test=UserCatalogIT` to run only `UserCatalogIT`. The clean step removes stale compiled classes before compilation; the build must fail on any Java compile error. Database-backed integration tests require Docker.

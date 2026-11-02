@@ -4,99 +4,74 @@ param(
 
 $ErrorActionPreference = "Stop"
 $BaseUrl = $BaseUrl.TrimEnd('/')
+$script:BaseUrl = $BaseUrl
 $script:Passed = 0
 $script:Failed = 0
+$script:Skipped = 0
 $script:Password = "SmokePass123"
 $script:State = @{}
+$script:SmokeHttpClient = $null
+$script:LastApiResponse = $null
+$script:SmokeSensitiveValues = @()
+$script:StepStatus = @{}
+$script:StepFailureRoot = @{}
+$script:StateOwner = @{}
+$script:StepDependencies = @{
+    "Resident login and /auth/me identity" = @("Register resident and reject duplicate email ignoring case")
+    "Resident can list the five seeded active services" = @("Resident login and /auth/me identity")
+    "Resident is forbidden from user management, including an empty POST body" = @("Resident login and /auth/me identity")
+    "Resident request validation and successful request creation" = @("Resident login and /auth/me identity", "Resident can list the five seeded active services")
+    "Admin request filtering and valid/invalid status transitions" = @("Resident request validation and successful request creation", "Super admin login, admin creation, and SUPER_ADMIN creation rejection")
+    "Resident history and notification read operations" = @("Admin request filtering and valid/invalid status transitions", "Resident login and /auth/me identity")
+    "Second resident is isolated from the first resident's requests" = @("Resident request validation and successful request creation")
+    "Dashboard role fields and counts agree with request filters" = @("Super admin login, admin creation, and SUPER_ADMIN creation rejection")
+    "Anonymous contact submission and admin visibility" = @("Super admin login, admin creation, and SUPER_ADMIN creation rejection", "Resident login and /auth/me identity")
+    "Admin deactivation blocks second resident and self-deactivation" = @("Super admin login, admin creation, and SUPER_ADMIN creation rejection", "Second resident is isolated from the first resident's requests")
+}
+
+. (Join-Path $PSScriptRoot "lib/http.ps1")
 
 function Step {
-    param(
-        [string]$Name,
-        [scriptblock]$Assertions
-    )
+    param([string]$Name, [scriptblock]$Assertions)
 
+    $dependencies = @()
+    if ($script:StepDependencies.ContainsKey($Name)) {
+        $dependencies = @($script:StepDependencies[$Name])
+    }
+    foreach ($dependency in $dependencies) {
+        if ($script:StepStatus[$dependency] -ne "PASS") {
+            $root = $dependency
+            if ($script:StepFailureRoot.ContainsKey($dependency)) { $root = $script:StepFailureRoot[$dependency] }
+            $script:Skipped++
+            $script:StepStatus[$Name] = "SKIP"
+            $script:StepFailureRoot[$Name] = $root
+            Write-Host ("SKIP  " + $Name + ": depends on a failed step (" + $root + ")") -ForegroundColor Yellow
+            return
+        }
+    }
+
+    $script:CurrentStep = $Name
+    $script:LastApiResponse = $null
     try {
         & $Assertions
         $script:Passed++
+        $script:StepStatus[$Name] = "PASS"
         Write-Host ("PASS  " + $Name) -ForegroundColor Green
     }
     catch {
+        $failureMessage = $_.Exception.Message
+        if ($failureMessage.StartsWith("SMOKE_SKIP|")) {
+            $root = $failureMessage.Substring("SMOKE_SKIP|".Length)
+            $script:Skipped++
+            $script:StepStatus[$Name] = "SKIP"
+            $script:StepFailureRoot[$Name] = $root
+            Write-Host ("SKIP  " + $Name + ": depends on a failed step (" + $root + ")") -ForegroundColor Yellow
+            return
+        }
         $script:Failed++
-        Write-Host ("FAIL  " + $Name + ": " + $_.Exception.Message) -ForegroundColor Red
-    }
-}
-
-function Invoke-Api {
-    param(
-        [Parameter(Mandatory = $true)][string]$Method,
-        [Parameter(Mandatory = $true)][string]$Path,
-        [AllowNull()][string]$Body,
-        [AllowNull()][string]$Token
-    )
-
-    $headers = @{}
-    if (-not [string]::IsNullOrWhiteSpace($Token)) {
-        $headers["Authorization"] = "Bearer $Token"
-    }
-
-    $request = @{
-        Method          = $Method
-        Uri             = ($BaseUrl + $Path)
-        Headers         = $headers
-        UseBasicParsing = $true
-        ErrorAction     = "Stop"
-    }
-    if ($null -ne $Body) {
-        $request["ContentType"] = "application/json; charset=utf-8"
-        $request["Body"] = [System.Text.Encoding]::UTF8.GetBytes($Body)
-    }
-
-    $statusCode = 0
-    $responseHeaders = $null
-    $rawBody = ""
-    try {
-        $response = Invoke-WebRequest @request
-        $statusCode = [int]$response.StatusCode
-        $responseHeaders = $response.Headers
-        $rawBody = [string]$response.Content
-    }
-    catch [System.Net.WebException] {
-        $webResponse = $_.Exception.Response
-        if ($null -eq $webResponse) {
-            throw ("HTTP request failed for {0} {1}; confirm the backend is running at BaseUrl." -f $Method, $Path)
-        }
-
-        $statusCode = [int]$webResponse.StatusCode
-        $responseHeaders = $webResponse.Headers
-        $stream = $webResponse.GetResponseStream()
-        if ($null -ne $stream) {
-            $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::UTF8)
-            try {
-                $rawBody = $reader.ReadToEnd()
-            }
-            finally {
-                $reader.Dispose()
-            }
-        }
-    }
-    catch {
-        throw ("HTTP request failed for {0} {1}; {2}" -f $Method, $Path, $_.Exception.Message)
-    }
-
-    $parsedBody = $null
-    if (-not [string]::IsNullOrWhiteSpace($rawBody)) {
-        try {
-            $parsedBody = ConvertFrom-Json -InputObject $rawBody -ErrorAction Stop
-        }
-        catch {
-            throw ("The response from {0} {1} was not valid JSON." -f $Method, $Path)
-        }
-    }
-
-    return [PSCustomObject]@{
-        StatusCode = $statusCode
-        Body       = $parsedBody
-        Headers    = $responseHeaders
+        $script:StepStatus[$Name] = "FAIL"
+        $script:StepFailureRoot[$Name] = $Name
+        Write-Host ("FAIL  " + $Name + ": " + $failureMessage + " | " + (Format-LastApiDiagnostic)) -ForegroundColor Red
     }
 }
 
@@ -138,9 +113,22 @@ function Require-State {
     param([string]$Name)
 
     if (-not $script:State.ContainsKey($Name) -or $null -eq $script:State[$Name]) {
-        throw ("A prior smoke-test step did not provide '{0}'." -f $Name)
+        $root = "an earlier step"
+        if ($script:StateOwner.ContainsKey($Name)) { $root = $script:StateOwner[$Name] }
+        throw ("SMOKE_SKIP|{0}" -f $root)
+    }
+    if ($script:StateOwner.ContainsKey($Name) -and $script:StepStatus[$script:StateOwner[$Name]] -ne "PASS") {
+        $root = $script:StateOwner[$Name]
+        if ($script:StepFailureRoot.ContainsKey($root)) { $root = $script:StepFailureRoot[$root] }
+        throw ("SMOKE_SKIP|{0}" -f $root)
     }
     return $script:State[$Name]
+}
+
+function Set-SmokeState {
+    param([string]$Name, $Value)
+    $script:State[$Name] = $Value
+    $script:StateOwner[$Name] = $script:CurrentStep
 }
 
 function Get-ApplicationDate {
@@ -171,6 +159,7 @@ if ([string]::IsNullOrWhiteSpace($env:RMS_SUPERADMIN_EMAIL) -or
     Write-Host "RMS_SUPERADMIN_EMAIL and RMS_SUPERADMIN_PASSWORD are required. Run . .\scripts\load-env.ps1 first." -ForegroundColor Red
     exit 1
 }
+$script:SmokeSensitiveValues = @($script:Password, $env:RMS_SUPERADMIN_PASSWORD, "invalid-smoke-token")
 
 $suffix = (Get-Date -Format "yyyyMMddHHmmss") + "-" + [Guid]::NewGuid().ToString("N").Substring(0, 6)
 $residentEmail = "smoke-resident-$suffix@example.test"
@@ -210,7 +199,7 @@ Step "Register resident and reject duplicate email ignoring case" {
         $response.Body.PSObject.Properties.Name -contains "password_hash") {
         throw "Registration response exposed a password field."
     }
-    $script:State.ResidentId = $response.Body.id
+    Set-SmokeState "ResidentId" $response.Body.id
 
     $duplicate = Get-JsonBody @{ fullName = $residentName; email = $residentEmail.ToUpperInvariant(); password = $script:Password; flatNumber = $residentFlat }
     $duplicateResponse = Invoke-Api -Method POST -Path "/api/v1/auth/register" -Body $duplicate
@@ -236,7 +225,8 @@ Step "Resident login and /auth/me identity" {
     Assert-Status $response 200
     Assert-NonEmpty $response.Body.accessToken "resident access token"
     Assert-Field $response.Body "tokenType" "Bearer"
-    $script:State.ResidentToken = $response.Body.accessToken
+    Set-SmokeState "ResidentToken" $response.Body.accessToken
+    $script:SmokeSensitiveValues += $response.Body.accessToken
 
     $me = Invoke-Api -Method GET -Path "/api/v1/auth/me" -Token $script:State.ResidentToken
     Assert-Status $me 200
@@ -247,16 +237,18 @@ Step "Resident login and /auth/me identity" {
 }
 
 Step "Resident can list the five seeded active services" {
-    $response = Invoke-Api -Method GET -Path "/api/v1/services?size=100" -Token (Require-State "ResidentToken")
-    Assert-Status $response 200
+    $residentToken = Require-State "ResidentToken"
     $requiredNames = @("Plumbing", "Electrical", "Cleaning", "Painting", "Internet Repair")
-    $serviceItems = @($response.Body.content)
     foreach ($name in $requiredNames) {
+        $encodedName = [Uri]::EscapeDataString($name)
+        $response = Invoke-Api -Method GET -Path ("/api/v1/services?q={0}&size=100" -f $encodedName) -Token $residentToken
+        Assert-Status $response 200
+        $serviceItems = @($response.Body.content)
         $match = $serviceItems | Where-Object { $_.name -eq $name -and $_.active -eq $true } | Select-Object -First 1
         if ($null -eq $match) {
             throw ("The active seeded service '{0}' was not in the response." -f $name)
         }
-        if ($name -eq "Plumbing") { $script:State.ServiceId = $match.id }
+        if ($name -eq "Plumbing") { Set-SmokeState "ServiceId" $match.id }
     }
 }
 
@@ -283,14 +275,15 @@ Step "Resident request validation and successful request creation" {
     Assert-Field $created.Body "overdue" $false
     Assert-Field $created.Body "flatNumber" $residentFlat
     Assert-NonEmpty $created.Body.id "request id"
-    $script:State.RequestId = $created.Body.id
+    Set-SmokeState "RequestId" $created.Body.id
 }
 
 Step "Super admin login, admin creation, and SUPER_ADMIN creation rejection" {
     $superLogin = Invoke-Api -Method POST -Path "/api/v1/auth/login" -Body (Get-JsonBody @{ email = $env:RMS_SUPERADMIN_EMAIL; password = $env:RMS_SUPERADMIN_PASSWORD })
     Assert-Status $superLogin 200
     Assert-NonEmpty $superLogin.Body.accessToken "super admin access token"
-    $script:State.SuperAdminToken = $superLogin.Body.accessToken
+    Set-SmokeState "SuperAdminToken" $superLogin.Body.accessToken
+    $script:SmokeSensitiveValues += $superLogin.Body.accessToken
 
     $adminEmail = "smoke-admin-$suffix@example.test"
     $adminName = "Smoke Admin $suffix"
@@ -299,8 +292,8 @@ Step "Super admin login, admin creation, and SUPER_ADMIN creation rejection" {
     Assert-Status $adminCreated 201
     Assert-Field $adminCreated.Body "role" "ADMIN"
     Assert-Field $adminCreated.Body "email" $adminEmail
-    $script:State.AdminId = $adminCreated.Body.id
-    $script:State.AdminEmail = $adminEmail
+    Set-SmokeState "AdminId" $adminCreated.Body.id
+    Set-SmokeState "AdminEmail" $adminEmail
 
     $forbiddenBody = Get-JsonBody @{ fullName = "Forbidden Smoke"; email = "smoke-forbidden-$suffix@example.test"; password = $script:Password; role = "SUPER_ADMIN" }
     $forbidden = Invoke-Api -Method POST -Path "/api/v1/users" -Body $forbiddenBody -Token $script:State.SuperAdminToken
@@ -310,7 +303,8 @@ Step "Super admin login, admin creation, and SUPER_ADMIN creation rejection" {
     $adminLogin = Invoke-Api -Method POST -Path "/api/v1/auth/login" -Body (Get-JsonBody @{ email = $adminEmail; password = $script:Password })
     Assert-Status $adminLogin 200
     Assert-NonEmpty $adminLogin.Body.accessToken "admin access token"
-    $script:State.AdminToken = $adminLogin.Body.accessToken
+    Set-SmokeState "AdminToken" $adminLogin.Body.accessToken
+    $script:SmokeSensitiveValues += $adminLogin.Body.accessToken
 }
 
 Step "Admin request filtering and valid/invalid status transitions" {
@@ -381,10 +375,11 @@ Step "Second resident is isolated from the first resident's requests" {
     $created = Invoke-Api -Method POST -Path "/api/v1/auth/register" -Body $body
     Assert-Status $created 201
     Assert-Field $created.Body "role" "USER"
-    $script:State.SecondResidentId = $created.Body.id
+    Set-SmokeState "SecondResidentId" $created.Body.id
     $login = Invoke-Api -Method POST -Path "/api/v1/auth/login" -Body (Get-JsonBody @{ email = $secondEmail; password = $script:Password })
     Assert-Status $login 200
-    $script:State.SecondResidentToken = $login.Body.accessToken
+    Set-SmokeState "SecondResidentToken" $login.Body.accessToken
+    $script:SmokeSensitiveValues += $login.Body.accessToken
 
     $requestId = Require-State "RequestId"
     $hidden = Invoke-Api -Method GET -Path "/api/v1/requests/$requestId" -Token $script:State.SecondResidentToken
@@ -444,7 +439,7 @@ Step "Anonymous contact submission and admin visibility" {
     $created = Invoke-Api -Method POST -Path "/api/v1/contact-queries" -Body $contactBody
     Assert-Status $created 201
     Assert-NonEmpty $created.Body.id "contact query id"
-    $script:State.ContactId = $created.Body.id
+    Set-SmokeState "ContactId" $created.Body.id
 
     $list = Invoke-Api -Method GET -Path "/api/v1/contact-queries?size=100" -Token (Require-State "AdminToken")
     Assert-Status $list 200
@@ -477,11 +472,17 @@ Step "Invalid bearer token is rejected on public contact submission" {
     $body = Get-JsonBody @{ name = "Invalid Token Visitor"; email = "invalid-token-$suffix@example.test"; subject = "Smoke check"; message = "This request should be rejected" }
     $response = Invoke-Api -Method POST -Path "/api/v1/contact-queries" -Body $body -Token "invalid-smoke-token"
     Assert-Status $response 401
-    Assert-Field $response.Body "code" "UNAUTHENTICATED"
+    if ($null -eq $response.Body -or $null -eq $response.Body.PSObject.Properties["code"]) {
+        throw ("Expected error code UNAUTHENTICATED after HTTP 401; raw response body: {0}" -f (Get-SafeResponseText $response.RawBody))
+    }
+    if ($response.Body.code -ne "UNAUTHENTICATED") {
+        throw ("Expected error code UNAUTHENTICATED after HTTP 401; raw response body: {0}" -f (Get-SafeResponseText $response.RawBody))
+    }
 }
 
+Close-SmokeHttpClient
 Write-Host ""
-Write-Host ("Smoke test summary: {0} passed, {1} failed." -f $script:Passed, $script:Failed)
+Write-Host ("Smoke test summary: {0} passed, {1} failed, {2} skipped." -f $script:Passed, $script:Failed, $script:Skipped)
 if ($script:Failed -gt 0) {
     exit 1
 }
