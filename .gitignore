@@ -5,6 +5,8 @@
 **/coverage/
 **/node_modules/
 .vite/
+playwright-report/
+test-results/
 
 # Java
 *.class

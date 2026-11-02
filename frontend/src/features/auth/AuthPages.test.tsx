@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -17,8 +17,9 @@ import { writeSession } from './session';
 
 function renderAuth(node: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><BrowserRouter><AuthProvider>{node}</AuthProvider></BrowserRouter></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><MemoryRouter><AuthProvider><Routes><Route path="*" element={<>{node}<LocationProbe /></>} /></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
 }
+function LocationProbe() { return <output aria-label="Current path">{useLocation().pathname}</output>; }
 const loginResponse = { accessToken: 'test-token', tokenType: 'Bearer', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user: { id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12' } };
 
 describe('authentication pages', () => {
@@ -50,7 +51,7 @@ describe('authentication pages', () => {
     await user.type(screen.getByLabelText('Confirm password *'), 'GoodPass123');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
     await waitFor(() => expect(called).toEqual(['register', 'login']));
-    expect(window.location.pathname).toBe('/resident');
+    expect(screen.getByLabelText('Current path')).toHaveTextContent('/resident');
     expect(document.body.textContent).not.toContain('GoodPass123');
   });
   it('login view passes axe accessibility checks', async () => {

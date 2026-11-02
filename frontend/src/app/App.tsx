@@ -1,7 +1,6 @@
 import { Component, Suspense, type ReactNode } from 'react';
-import { RouterProvider } from 'react-router-dom';
+import { RouterProvider, type DataRouter } from 'react-router-dom';
 import { Providers } from './Providers';
-import { router } from './router';
 import { RootErrorFallback } from './pages';
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -11,4 +10,6 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
   render() { return this.state.failed ? <RootErrorFallback /> : this.props.children; }
 }
 
-export function App() { return <RootErrorBoundary><Providers><Suspense fallback={<p role="status">Loading...</p>}><RouterProvider router={router} /></Suspense></Providers></RootErrorBoundary>; }
+export function App({ router }: { router: DataRouter }) {
+  return <RootErrorBoundary><Providers><Suspense fallback={<p role="status">Loading...</p>}><RouterProvider router={router} /></Suspense></Providers></RootErrorBoundary>;
+}

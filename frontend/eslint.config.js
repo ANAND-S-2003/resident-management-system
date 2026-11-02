@@ -22,4 +22,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
+  {
+    files: ['src/app/App.test.tsx'],
+    rules: { 'no-console': ['error', { allow: ['error'] }] },
+  },
 );

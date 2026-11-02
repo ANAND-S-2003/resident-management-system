@@ -76,3 +76,17 @@ npm run build
 ```
 
 Vitest uses jsdom, React Testing Library, jest-dom, user-event and MSW v2. Keep tests isolated from real services; add API behavior to MSW handlers. Accessibility checks use axe-core. Use TanStack Query for server data and shared query keys in `src/lib/query-keys.ts`; do not fetch server data from `useEffect`.
+
+## Browser end-to-end tests (Windows PowerShell)
+
+Start MySQL and the backend using the repository's [README local-run steps](../README.md#backend-local-run-windows-powershell), and keep the backend running. In another PowerShell window, load the environment variables (including the super-admin login used by the suite), then install Chromium once and run the real-browser suite:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+. .\scripts\load-env.ps1
+cd frontend
+npm run e2e:install
+npm run e2e
+```
+
+The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. The suite checks login, registration, role routing, logout history behavior, the mobile drawer, and serious or critical axe violations (including color contrast) in light and dark schemes. It requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.

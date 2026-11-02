@@ -68,6 +68,20 @@ npm run dev
 
 Vite prints the development URL. To verify the frontend, run `npm run typecheck`, `npm run lint`, `npm run test -- --run`, and `npm run build` from `frontend/`. See [frontend architecture and routes](docs/frontend.md).
 
+### Frontend browser tests (Windows PowerShell)
+
+First start MySQL and the backend using the steps in [Backend local run](#backend-local-run-windows-powershell). Keep that window running. In a second PowerShell window from the repository root, load the same environment so the Playwright tests can sign in as the configured super admin:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+. .\scripts\load-env.ps1
+cd frontend
+npm run e2e:install
+npm run e2e
+```
+
+Run `npm run e2e:install` once to install Chromium. The E2E suite uses the real backend and database, creates uniquely named test residents, and leaves those records in the database.
+
 ## Repository layout
 
 - `backend/` - Java backend skeleton and schema migrations

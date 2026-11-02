@@ -18,6 +18,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     environmentOptions: { jsdom: { url: TEST_API_ORIGIN } },
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     setupFiles: './src/test/setup.ts',
     globals: true,
     css: true,
