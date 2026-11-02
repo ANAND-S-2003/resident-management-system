@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, redactDiagnosticText, test } from './fixtures';
+import type { APIRequestContext, Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 const backendApi = 'http://localhost:8080/api/v1';
@@ -7,8 +8,8 @@ const backendApi = 'http://localhost:8080/api/v1';
 function addBrowserErrorAssertions(page: Page) {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
-  page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
-  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(redactDiagnosticText(message.text())); });
+  page.on('pageerror', (error) => pageErrors.push(redactDiagnosticText(error.message)));
   return async () => {
     expect(consoleErrors, 'Browser console errors').toEqual([]);
     expect(pageErrors, 'Unhandled page errors').toEqual([]);
@@ -44,15 +45,19 @@ async function signIn(page: Page, email: string, password: string) {
   await page.goto('/login');
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill(password);
+  const loginResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/login'));
   await page.getByRole('button', { name: 'Sign in' }).click();
+  const response = await loginResponse;
+  return response;
 }
 
 async function signInSuperAdmin(page: Page) {
   const email = process.env.RMS_SUPERADMIN_EMAIL;
   const password = process.env.RMS_SUPERADMIN_PASSWORD;
   if (!email || !password) throw new Error('Super admin E2E credentials are missing; load them with scripts/load-env.ps1.');
-  await signIn(page, email, password);
-  await expect(page).toHaveURL(/\/admin$/);
+  const response = await signIn(page, email, password);
+  expect(response.status(), 'Super admin login response status').toBe(200);
+  await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
 }
 
 async function expectSeriousAxeClean(page: Page, scheme: 'light' | 'dark') {
@@ -79,19 +84,25 @@ test('a resident registers, signs out, and signs back in', async ({ page }) => {
   await page.locator('input[name="flatNumber"]').fill(resident.flatNumber);
   await page.locator('input[name="password"]').fill(resident.password);
   await page.locator('input[name="confirmPassword"]').fill(resident.password);
+  const registrationResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/register'));
+  const loginResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/login'));
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/resident$/);
+  expect((await registrationResponse).status(), 'Resident registration response status').toBe(201);
+  expect((await loginResponse).status(), 'Resident login response status').toBe(200);
+  await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
   await expect(page.getByRole('heading', { name: 'Resident dashboard' })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);
-  await signIn(page, resident.email, resident.password);
-  await expect(page).toHaveURL(/\/resident$/);
+  const login = await signIn(page, resident.email, resident.password);
+  expect(login.status(), 'Resident login response status').toBe(200);
+  await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
   await expect(page.getByRole('heading', { name: 'Resident dashboard' })).toBeVisible();
 });
 
 test('wrong password shows the generic login error', async ({ page }) => {
   const resident = uniqueResident();
-  await signIn(page, resident.email, 'WrongPassword123');
+  const response = await signIn(page, resident.email, 'WrongPassword123');
+  expect(response.status(), 'Wrong-password login response status').toBe(401);
   await expect(page.getByText('Invalid email or password')).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
@@ -104,15 +115,17 @@ test('SUPER_ADMIN signs in and sees the Admins navigation item', async ({ page }
 
 test('a resident visiting /admin sees Forbidden', async ({ page, request }) => {
   const resident = await createResident(request);
-  await signIn(page, resident.email, resident.password);
-  await expect(page).toHaveURL(/\/resident$/);
+  const response = await signIn(page, resident.email, resident.password);
+  expect(response.status(), 'Resident login response status').toBe(200);
+  await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
 });
 
 test('browser Back after logout does not reveal protected content', async ({ page, request }) => {
   const resident = await createResident(request);
-  await signIn(page, resident.email, resident.password);
+  const response = await signIn(page, resident.email, resident.password);
+  expect(response.status(), 'Resident login response status').toBe(200);
   await expect(page.getByRole('heading', { name: 'Resident dashboard' })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -123,7 +136,9 @@ test('browser Back after logout does not reveal protected content', async ({ pag
 test('mobile navigation traps focus, closes with Escape, and fits the viewport', async ({ page, request }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   const resident = await createResident(request);
-  await signIn(page, resident.email, resident.password);
+  const response = await signIn(page, resident.email, resident.password);
+  expect(response.status(), 'Resident login response status').toBe(200);
+  await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
   const openButton = page.getByRole('button', { name: 'Open navigation menu' });
   await openButton.click();
   const drawer = page.getByRole('dialog', { name: 'Mobile navigation' });

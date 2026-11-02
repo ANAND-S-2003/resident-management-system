@@ -48,7 +48,33 @@ DTO shapes, enum spellings, validation limits and error codes follow the authori
 
 ## Design tokens and components
 
-The calm blue/slate palette is defined by CSS variables and Tailwind tokens. Light and dark palettes follow `prefers-color-scheme`; no theme toggle is present. Components provide visible focus rings, semantic roles and labels, keyboard-operable controls, responsive layouts from 320px, and reduced-motion handling. The `StatusBadge` uses both the status wording and a distinct color, with overdue shown separately. The current axe-core tests cover the authentication form; additional route-level checks should accompany future screen work.
+The calm blue/slate palette is defined by CSS variables and Tailwind tokens. Light tokens are in `:root`; dark tokens are scoped to `@media (prefers-color-scheme: dark)`. The light palette intentionally uses dark navy text on a light canvas; those colors are not mixed from the dark scheme. Inline links are underlined in both schemes so links in running text remain identifiable without relying on color alone. No theme toggle is present. Components provide visible focus rings, semantic roles and labels, keyboard-operable controls, responsive layouts from 320px, and reduced-motion handling. The `StatusBadge` uses both the status wording and a distinct color, with overdue shown separately.
+
+Contrast ratios below use WCAG relative luminance calculations for foreground/background pairs used by the design tokens and semantic components. Text against its actual background meets 4.5:1, and UI component pairs meet 3:1. Inline links remain underlined in both themes; their adjacent-text contrast is shown separately because underlining distinguishes links even where the adjacent-text ratio is below 3:1.
+
+| Token or component | Foreground | Background | Ratio |
+|---|---|---|---:|
+| Light primary text | `#0f172a` | `#ffffff` | 17.85:1 |
+| Light muted text | `#475569` | `#ffffff` | 7.58:1 |
+| Light link | `#2563eb` | `#ffffff` | 5.17:1 |
+| Light inline link vs adjacent text | `#2563eb` | `#0f172a` | 3.45:1 |
+| Dark primary text | `#f8fafc` | `#1e293b` | 13.98:1 |
+| Dark muted text | `#cbd5e1` | `#1e293b` | 9.85:1 |
+| Dark link | `#93c5fd` | `#1e293b` | 8.11:1 |
+| Dark inline link vs adjacent text | `#93c5fd` | `#f8fafc` | 1.72:1 (underlined) |
+| Light focus ring | `#1d4ed8` | `#ffffff` | 6.70:1 |
+| Dark focus ring | `#93c5fd` | `#1e293b` | 8.11:1 |
+| Light field error | `#b91c1c` | `#ffffff` | 6.47:1 |
+| Dark field error | `#fca5a5` | `#1e293b` | 7.71:1 |
+| Primary button | `#ffffff` | `#1d4ed8` | 6.70:1 |
+| Danger button | `#ffffff` | `#b91c1c` | 6.47:1 |
+| Info badge/alert | `#1e3a8a` | `#dbeafe` | 8.49:1 |
+| Success badge/alert | `#14532d` | `#dcfce7` | 8.30:1 |
+| Warning badge/alert | `#713f12` | `#fef3c7` | 7.79:1 |
+| Error badge/alert | `#7f1d1d` | `#fee2e2` | 8.20:1 |
+| Light active navigation | `#1e3a8a` | `#dbeafe` | 8.49:1 |
+| Dark active navigation | `#eff6ff` | `#1e3a8a` | 9.52:1 |
+| Neutral badge | `#1e293b` | `#e2e8f0` | 11.87:1 |
 
 Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a repository-owned asset path in that configuration; the text wordmark is used when it is `null`. Do not add third-party branding or contact details to the UI. Axe checks cover Login, Register, and the authenticated shell; keyboard tests cover the mobile drawer and route guards.
 
@@ -89,4 +115,4 @@ npm run e2e:install
 npm run e2e
 ```
 
-The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. The suite checks login, registration, role routing, logout history behavior, the mobile drawer, and serious or critical axe violations (including color contrast) in light and dark schemes. It requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.
+The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL path, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. The suite checks login, registration, role routing, logout history behavior, the mobile drawer, and serious or critical axe violations (including color contrast) in light and dark schemes. It requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.

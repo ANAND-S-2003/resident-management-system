@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { apiRequest, setUnauthorizedHandler } from '@/lib/api/client';
@@ -20,6 +20,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
+  const initialRestoreHandled = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [storedSession] = useState(readSession);
   const storedSessionValid = !!storedSession && Date.parse(storedSession.expiresAt) > Date.now();
@@ -50,14 +51,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
 
   useEffect(() => {
+    // Restore only the session captured at mount. A successful login later in
+    // this provider's lifetime must not be cleared because that snapshot was empty.
+    if (initialRestoreHandled.current) return;
     if (!storedSessionValid) {
-      clearStoredSession(); setSession(null); setStatus('anonymous');
+      if (storedSession) clearStoredSession();
+      setSession(null); setStatus('anonymous');
+      initialRestoreHandled.current = true;
     } else if (restoredUser.data && storedSession) {
       const next = { ...storedSession, user: restoredUser.data };
       writeSession(next); setSession(next); setStatus('authenticated');
+      initialRestoreHandled.current = true;
     } else if (restoredUser.isError) {
       const invalidSession = restoredUser.error instanceof Error && 'status' in restoredUser.error && restoredUser.error.status === 401;
-      if (invalidSession) { clearStoredSession(); setSession(null); setStatus('anonymous'); }
+      if (invalidSession) { clearStoredSession(); setSession(null); setStatus('anonymous'); initialRestoreHandled.current = true; }
       else setStatus('error');
     }
   }, [restoredUser.data, restoredUser.error, restoredUser.isError, storedSession, storedSessionValid]);
