@@ -99,6 +99,6 @@ describe('real application router composition', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Resident dashboard' })).toBeInTheDocument();
     expect(await screen.findByText('Your session has expired. Please sign in again.', {}, { timeout: 7000 })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 3000 })).toBeInTheDocument();
   }, 10_000);
 });

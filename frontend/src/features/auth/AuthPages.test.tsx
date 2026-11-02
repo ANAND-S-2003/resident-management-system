@@ -77,9 +77,9 @@ describe('authentication pages', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<ComingSoon title="Resident dashboard" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
     await screen.findByRole('heading', { name: 'Resident dashboard' });
-    const menuButton = screen.getByRole('button', { name: 'Open navigation menu' });
+    const menuButton = screen.getByRole('button', { name: /Open navigation menu/ });
     await user.click(menuButton);
-    const closeButton = screen.getByRole('button', { name: 'Close navigation menu' });
+    const closeButton = screen.getByRole('button', { name: /Close navigation menu/ });
     expect(closeButton).toHaveFocus();
     await user.keyboard('{Shift>}{Tab}{/Shift}');
     expect(within(screen.getByRole('dialog', { name: 'Mobile navigation' })).getByRole('link', { name: 'Account' })).toHaveFocus();

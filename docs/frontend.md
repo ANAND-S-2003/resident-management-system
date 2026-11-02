@@ -56,17 +56,25 @@ Contrast ratios below use WCAG relative luminance calculations for foreground/ba
 |---|---|---|---:|
 | Light primary text | `#0f172a` | `#ffffff` | 17.85:1 |
 | Light muted text | `#475569` | `#ffffff` | 7.58:1 |
+| Light placeholder text | `#475569` | `#ffffff` | 7.58:1 |
 | Light link | `#2563eb` | `#ffffff` | 5.17:1 |
 | Light inline link vs adjacent text | `#2563eb` | `#0f172a` | 3.45:1 |
+| Light field border | `#64748b` | `#ffffff` | 4.76:1 |
+| Light field border on canvas | `#64748b` | `#f8fafc` | 4.55:1 |
 | Dark primary text | `#f8fafc` | `#1e293b` | 13.98:1 |
 | Dark muted text | `#cbd5e1` | `#1e293b` | 9.85:1 |
-| Dark link | `#93c5fd` | `#1e293b` | 8.11:1 |
-| Dark inline link vs adjacent text | `#93c5fd` | `#f8fafc` | 1.72:1 (underlined) |
+| Dark placeholder text | `#cbd5e1` | `#1e293b` | 9.85:1 |
+| Dark link | `#528ff0` | `#1e293b` | 4.56:1 |
+| Dark inline link vs adjacent text | `#528ff0` | `#f8fafc` | 3.07:1 |
+| Dark field border | `#94a3b8` | `#1e293b` | 5.71:1 |
+| Dark field border on canvas | `#94a3b8` | `#0f172a` | 6.96:1 |
 | Light focus ring | `#1d4ed8` | `#ffffff` | 6.70:1 |
 | Dark focus ring | `#93c5fd` | `#1e293b` | 8.11:1 |
 | Light field error | `#b91c1c` | `#ffffff` | 6.47:1 |
 | Dark field error | `#fca5a5` | `#1e293b` | 7.71:1 |
+| Dark password toggle | `#bfdbfe` | `#1e293b` | 10.30:1 |
 | Primary button | `#ffffff` | `#1d4ed8` | 6.70:1 |
+| Disabled primary button | `#ffffff` | `#1e40af` | 8.72:1 |
 | Danger button | `#ffffff` | `#b91c1c` | 6.47:1 |
 | Info badge/alert | `#1e3a8a` | `#dbeafe` | 8.49:1 |
 | Success badge/alert | `#14532d` | `#dcfce7` | 8.30:1 |
@@ -76,7 +84,9 @@ Contrast ratios below use WCAG relative luminance calculations for foreground/ba
 | Dark active navigation | `#eff6ff` | `#1e3a8a` | 9.52:1 |
 | Neutral badge | `#1e293b` | `#e2e8f0` | 11.87:1 |
 
-Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a repository-owned asset path in that configuration; the text wordmark is used when it is `null`. Do not add third-party branding or contact details to the UI. Axe checks cover Login, Register, and the authenticated shell; keyboard tests cover the mobile drawer and route guards.
+The field-border ratios exceed the 3:1 non-text component threshold against both surface and canvas. `PENDING` and `IN_PROGRESS` use warning and info badge pairs; `COMPLETED`, `REJECTED`, and `Overdue` use success and danger pairs. Disabled buttons retain full-contrast text; disabled state is conveyed through native disabled behavior and cursor without fading the label. Menu, drawer close, and password-toggle controls have at least 44x44 CSS pixel targets; toast dismissal is at least 24x24, and other controls are at least 40px tall. Focus-visible controls use a 3px outline in the scheme's focus color.
+
+Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a repository-owned asset path in that configuration; the text wordmark is used when it is `null`. Do not add third-party branding or contact details to the UI. Browser axe checks scan Login, Register, resident and SUPER_ADMIN shell placeholders, and the mobile drawers in both color schemes, aggregating serious and critical findings. Keyboard tests cover the mobile drawer and route guards.
 
 ## Run locally (Windows PowerShell)
 
@@ -115,4 +125,4 @@ npm run e2e:install
 npm run e2e
 ```
 
-The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL path, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. The suite checks login, registration, role routing, logout history behavior, the mobile drawer, and serious or critical axe violations (including color contrast) in light and dark schemes. It requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.
+The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. The axe test scans Login, Register, resident and SUPER_ADMIN shell placeholders, and both mobile drawers in light and dark schemes, then reports all serious or critical findings together. The suite requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.

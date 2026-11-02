@@ -60,11 +60,26 @@ async function signInSuperAdmin(page: Page) {
   await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
 }
 
-async function expectSeriousAxeClean(page: Page, scheme: 'light' | 'dark') {
+async function collectSeriousAxeViolations(page: Page, pageName: string, scheme: 'light' | 'dark', findings: string[]) {
   await page.emulateMedia({ colorScheme: scheme });
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   const serious = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
-  expect(serious, `Serious or critical accessibility violations in ${scheme} mode`).toEqual([]);
+  for (const violation of serious) {
+    for (const node of violation.nodes) {
+      findings.push(`${pageName} | ${scheme} | ${violation.id} (${violation.impact}) | ${node.target.join(', ')} | ${(node.failureSummary ?? violation.help).replace(/\s+/g, ' ').trim()}`);
+    }
+  }
+}
+
+async function collectBothSchemes(page: Page, pageName: string, findings: string[]) {
+  await collectSeriousAxeViolations(page, pageName, 'light', findings);
+  await collectSeriousAxeViolations(page, pageName, 'dark', findings);
+}
+
+async function openAndCollect(page: Page, path: string, pageName: string, findings: string[]) {
+  await page.goto(path);
+  await expect(page.locator('h1').first(), `${pageName} heading`).toBeVisible();
+  await collectBothSchemes(page, pageName, findings);
 }
 
 test('login renders without browser console or page errors', async ({ page }) => {
@@ -152,14 +167,41 @@ test('mobile navigation traps focus, closes with Escape, and fits the viewport',
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test('login and authenticated shell have no serious or critical axe violations in light and dark mode', async ({ page }) => {
-  await page.goto('/login');
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-  await expectSeriousAxeClean(page, 'light');
-  await expectSeriousAxeClean(page, 'dark');
+test('login, register, resident and SUPER_ADMIN shells pass axe in both schemes and mobile drawers', async ({ page, request }) => {
+  const findings: string[] = [];
+  await openAndCollect(page, '/login', 'Login page', findings);
+  await openAndCollect(page, '/register', 'Register page', findings);
 
+  const resident = await createResident(request);
+  const residentLogin = await signIn(page, resident.email, resident.password);
+  expect(residentLogin.status(), 'Resident login for accessibility scan').toBe(200);
+  await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'Resident dashboard' })).toBeVisible();
+  await collectBothSchemes(page, 'Resident shell home placeholder', findings);
+  await openAndCollect(page, '/resident/requests/new', 'Resident new-request placeholder', findings);
+
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/resident');
+  await expect(page.getByRole('heading', { name: 'Resident dashboard' })).toBeVisible();
+  await page.getByRole('button', { name: /Open navigation menu/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).toBeVisible();
+  await collectBothSchemes(page, 'Resident shell with mobile drawer open', findings);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /Sign out/ }).click();
+  await expect(page).toHaveURL(/\/login$/);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
   await signInSuperAdmin(page);
   await expect(page.getByRole('heading', { name: 'Admin dashboard' })).toBeVisible();
-  await expectSeriousAxeClean(page, 'light');
-  await expectSeriousAxeClean(page, 'dark');
+  await collectBothSchemes(page, 'SUPER_ADMIN shell home placeholder', findings);
+  await openAndCollect(page, '/admin/admins', 'SUPER_ADMIN admin-management placeholder', findings);
+
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/admin');
+  await expect(page.getByRole('heading', { name: 'Admin dashboard' })).toBeVisible();
+  await page.getByRole('button', { name: /Open navigation menu/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Mobile navigation' })).toBeVisible();
+  await collectBothSchemes(page, 'SUPER_ADMIN shell with mobile drawer open', findings);
+
+  expect(findings, `Serious or critical axe violations (${findings.length}):\n${findings.map((finding, index) => `${index + 1}. ${finding}`).join('\n')}`).toEqual([]);
 });

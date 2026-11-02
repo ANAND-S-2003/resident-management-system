@@ -59,6 +59,7 @@ export function Pagination({ page, size, totalElements, onPageChange, onSizeChan
 /** Focus-trapped modal that restores focus and closes on Escape. */
 export function Dialog({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const dialogRef = useRef<HTMLDivElement>(null); const previousFocus = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   useEffect(() => {
     if (!open) return;
     previousFocus.current = document.activeElement as HTMLElement;
@@ -75,7 +76,7 @@ export function Dialog({ open, title, onClose, children }: { open: boolean; titl
     document.addEventListener('keydown', keyHandler); return () => { document.removeEventListener('keydown', keyHandler); previousFocus.current?.focus(); };
   }, [open, onClose]);
   if (!open) return null;
-  return <div className="dialog-backdrop"><div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}><h2 id="dialog-title">{title}</h2>{children}</div></div>;
+  return <div className="dialog-backdrop"><div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><h2 id={titleId}>{title}</h2>{children}</div></div>;
 }
 /** Confirmation modal that keeps the same keyboard and focus guarantees as Dialog. */
 export function ConfirmDialog(props: { open: boolean; title: string; onClose: () => void; onConfirm: () => void; children: ReactNode }) { return <Dialog open={props.open} title={props.title} onClose={props.onClose}><div>{props.children}</div><div className="dialog-actions"><Button variant="secondary" onClick={props.onClose}>Cancel</Button><Button variant="danger" onClick={props.onConfirm}>Confirm</Button></div></Dialog>; }
@@ -85,7 +86,7 @@ interface ToastItem { id: number; message: string }
 export function ToastProvider({ children }: { children: ReactNode }) { const [items, setItems] = useState<ToastItem[]>([]); const nextId = useRef(0); const dismiss = useCallback((id: number) => setItems((current) => current.filter((item) => item.id !== id)), []);
   useEffect(() => { if (!items.length) return; const timers = items.map((item) => window.setTimeout(() => dismiss(item.id), 5000)); return () => timers.forEach(window.clearTimeout); }, [items, dismiss]);
   const toast = (message: string) => setItems((current) => [...current, { id: ++nextId.current, message }]);
-  return <ToastContext.Provider value={toast}>{children}<div className="toast-region" aria-live="polite" aria-relevant="additions text">{items.map((item) => <div className="toast" key={item.id}>{item.message}<button aria-label="Dismiss notification" onClick={() => dismiss(item.id)}>×</button></div>)}</div></ToastContext.Provider>;
+  return <ToastContext.Provider value={toast}>{children}<div className="toast-region" aria-live="polite" aria-relevant="additions text">{items.map((item) => <div className="toast" key={item.id}>{item.message}<button aria-label="× Dismiss notification" onClick={() => dismiss(item.id)}>×</button></div>)}</div></ToastContext.Provider>;
 }
 const ToastContext = createContext<((message: string) => void) | null>(null);
 export function useToast() { const toast = useContext(ToastContext); if (!toast) throw new Error('useToast must be used inside ToastProvider'); return toast; }
