@@ -18,6 +18,32 @@ Resident Management System (RMS), a role-based residential community service-req
 5. Check `http://localhost:8080/actuator/health`.
 6. Stop the application with Ctrl+C, then stop MySQL from the repository root with `docker compose down`.
 
+## Smoke test
+
+Use two PowerShell windows. These steps run the end-to-end smoke test against the local backend; it creates uniquely named sample records and does not delete data.
+
+**Window 1** (repository root):
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+. .\scripts\load-env.ps1
+docker compose up -d db
+cd backend
+mvn spring-boot:run
+```
+
+Wait until the log says the application has started.
+
+**Window 2** (repository root):
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+. .\scripts\load-env.ps1
+.\scripts\smoke-test.ps1
+```
+
+Stop the application with Ctrl+C in Window 1, then run `docker compose down` from the repository root. Database data stays in the Docker volume unless you run `docker compose down -v`. Anonymous contact submissions are rate-limited to five per hour per client IP, so repeated smoke runs from the same IP can hit the documented limit until its rolling window expires.
+
 ## Backend verification
 
 From `backend/`, run `mvn clean verify` for the full suite, or `mvn clean verify -Dit.test=UserCatalogIT` to run only `UserCatalogIT`. The clean step removes stale compiled classes before compilation; the build must fail on any Java compile error. Database-backed integration tests require Docker.
