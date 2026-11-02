@@ -33,4 +33,15 @@ public class ResidentNotification {
     private Instant readAt;
 
     protected ResidentNotification() {}
+    public static ResidentNotification create(Long recipientId, Long requestId, NotificationType type,
+                                               String message, Instant createdAt) {
+        ResidentNotification value = new ResidentNotification(); value.recipientId = recipientId;
+        value.requestId = requestId; value.type = type; value.message = message;
+        value.read = false; value.createdAt = createdAt; return value;
+    }
+    public void markRead(Instant now) { if (!read) { read = true; readAt = now; } }
+    public Long getId() { return id; } public Long getRecipientId() { return recipientId; }
+    public Long getRequestId() { return requestId; } public NotificationType getType() { return type; }
+    public String getMessage() { return message; } public boolean isRead() { return read; }
+    public Instant getCreatedAt() { return createdAt; } public Instant getReadAt() { return readAt; }
 }

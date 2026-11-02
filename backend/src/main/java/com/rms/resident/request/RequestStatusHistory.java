@@ -31,4 +31,14 @@ public class RequestStatusHistory {
     private Instant createdAt;
 
     protected RequestStatusHistory() {}
+    public static RequestStatusHistory create(Long requestId, RequestStatus from, RequestStatus to,
+                                               Long changedBy, String remarks, Instant createdAt) {
+        RequestStatusHistory value = new RequestStatusHistory(); value.requestId = requestId;
+        value.fromStatus = from; value.toStatus = to; value.changedBy = changedBy;
+        value.remarks = remarks; value.createdAt = createdAt; return value;
+    }
+    public Long getId() { return id; } public Long getRequestId() { return requestId; }
+    public RequestStatus getFromStatus() { return fromStatus; } public RequestStatus getToStatus() { return toStatus; }
+    public Long getChangedBy() { return changedBy; } public String getRemarks() { return remarks; }
+    public Instant getCreatedAt() { return createdAt; }
 }

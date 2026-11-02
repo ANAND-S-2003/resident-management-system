@@ -21,12 +21,15 @@ import java.util.List;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = {
         com.rms.resident.user.UserAdministrationController.class,
-        com.rms.resident.catalog.ServiceCatalogController.class
+        com.rms.resident.catalog.ServiceCatalogController.class,
+        com.rms.resident.request.RequestController.class,
+        com.rms.resident.notification.NotificationController.class
 })
 @Import({SecurityConfiguration.class, SecurityErrorWriter.class, ApiAuthenticationEntryPoint.class,
         ApiAccessDeniedHandler.class, UserCatalogAuthorizationTest.TestBeans.class})
@@ -36,10 +39,28 @@ class UserCatalogAuthorizationTest {
     @MockBean UserAccountRepository users;
     @MockBean UserAdministrationService userService;
     @MockBean ServiceCatalogService serviceCatalog;
+    @MockBean com.rms.resident.request.RequestService requestService;
+    @MockBean com.rms.resident.notification.NotificationService notificationService;
 
     @Test void authorizationPrecedesRequiredBodyValidationOnAllAdminRoutes() throws Exception {
         assertDeniedBeforeValidation(null, 401);
         assertDeniedBeforeValidation("ROLE_USER", 403);
+    }
+
+    @Test void requestAndNotificationAuthorizationPrecedesBodyValidation() throws Exception {
+        mvc.perform(patch("/api/v1/requests/1").contentType("application/json").content("")
+                .with(user("user").authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mvc.perform(patch("/api/v1/requests/1").contentType("application/json").content(""))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        mvc.perform(post("/api/v1/requests").contentType("application/json").content("")
+                .with(user("admin").authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        for (String role : List.of("ROLE_ADMIN", "ROLE_SUPER_ADMIN")) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/notifications")
+                    .with(user("admin").authorities(new SimpleGrantedAuthority(role))))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
     }
 
     private void assertDeniedBeforeValidation(String authority, int expectedStatus) throws Exception {

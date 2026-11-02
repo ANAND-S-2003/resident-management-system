@@ -29,6 +29,7 @@ Statuses are exactly `PENDING`, `IN_PROGRESS`, `COMPLETED`, and `REJECTED`. Allo
 A request is overdue exactly when expected completion date is before the current date in `RMS_TIMEZONE` and status is `PENDING` or `IN_PROGRESS`. Overdue is computed, never stored. `COMPLETED` and `REJECTED` requests are never overdue. Request date and overdue's current date use the same configured zone and one injectable `Clock`; `RMS_TIMEZONE` defaults to `Asia/Kolkata`.
 
 Every request creation adds history from NULL to `PENDING`, changed by the resident. Every actual status change adds a history row in the same transaction as the request update. Concurrent updates return `409 CONCURRENT_MODIFICATION`.
+An admin-remarks-only update is allowed for an open request (`PENDING` or `IN_PROGRESS`) and changes the current remarks without adding history or a notification. Remarks-only updates on final statuses are rejected as a closed-request transition. Status-change notification text is plain text and truncated to 500 characters.
 
 Residents can view only their requests; ADMIN and SUPER_ADMIN can view all. Request lists support status, overdue, and (for ADMIN+) resident-name/flat-number search. `overdue=true` includes only overdue, `overdue=false` only non-overdue, and omitted means no overdue filter. Status and overdue filters combine using AND.
 

@@ -43,4 +43,25 @@ public class ServiceRequest {
     private Instant updatedAt;
 
     protected ServiceRequest() {}
+
+    public static ServiceRequest create(Long residentId, String flatNumber, Long serviceId, String description,
+                                        LocalDate requestDate, LocalDate expectedCompletionDate, Instant now) {
+        ServiceRequest value = new ServiceRequest();
+        value.residentId = residentId; value.flatNumber = flatNumber; value.serviceId = serviceId;
+        value.description = description; value.requestDate = requestDate;
+        value.expectedCompletionDate = expectedCompletionDate; value.status = RequestStatus.PENDING;
+        value.version = 0L; value.createdAt = now; value.updatedAt = now;
+        return value;
+    }
+    public void changeStatus(RequestStatus status, String remarks, Instant now) {
+        this.status = status; if (remarks != null) this.adminRemarks = remarks; this.updatedAt = now;
+    }
+    public void updateRemarks(String remarks, Instant now) { this.adminRemarks = remarks; this.updatedAt = now; }
+    public Long getId() { return id; } public Long getResidentId() { return residentId; }
+    public String getFlatNumber() { return flatNumber; } public Long getServiceId() { return serviceId; }
+    public String getDescription() { return description; } public LocalDate getRequestDate() { return requestDate; }
+    public LocalDate getExpectedCompletionDate() { return expectedCompletionDate; }
+    public RequestStatus getStatus() { return status; } public String getAdminRemarks() { return adminRemarks; }
+    public Long getVersion() { return version; } public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }

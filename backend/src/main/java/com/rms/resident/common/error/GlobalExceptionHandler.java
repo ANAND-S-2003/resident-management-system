@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiErrorResponse> handleApiException(ApiException ex, HttpServletRequest request) {
-        return response(ex.errorCode(), ex.getMessage(), request, List.of());
+        return response(ex.errorCode(), ex.getMessage(), request, ex.details());
     }
 
     @ExceptionHandler(AccessDeniedException.class)

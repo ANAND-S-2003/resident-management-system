@@ -87,6 +87,14 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/services/**").hasAnyAuthority(
                                 com.rms.resident.common.enums.Role.ADMIN_AUTHORITY,
                                 com.rms.resident.common.enums.Role.SUPER_ADMIN_AUTHORITY)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/requests").hasAuthority(
+                                com.rms.resident.common.enums.Role.USER_AUTHORITY)
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/requests/**").hasAnyAuthority(
+                                com.rms.resident.common.enums.Role.ADMIN_AUTHORITY,
+                                com.rms.resident.common.enums.Role.SUPER_ADMIN_AUTHORITY)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/requests", "/api/v1/requests/**").authenticated()
+                        .requestMatchers("/api/v1/notifications/**").hasAuthority(
+                                com.rms.resident.common.enums.Role.USER_AUTHORITY)
                         .requestMatchers(HttpMethod.GET, "/api/v1/services", "/api/v1/services/**").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, CorsFilter.class);

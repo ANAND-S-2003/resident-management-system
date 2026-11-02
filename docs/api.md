@@ -124,6 +124,7 @@ Errors 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
 ### `PATCH /requests/{requestId}` - ADMIN, SUPER_ADMIN
 Request may include `status` and/or `adminRemarks`; at least one required. Remarks max 1000 chars. Allowed transitions: `PENDING` -> `IN_PROGRESS` or `REJECTED`; `IN_PROGRESS` -> `COMPLETED` or `REJECTED`; `COMPLETED` and `REJECTED` final. Setting REJECTED requires non-empty, non-blank remarks. Every actual status change inserts history and a resident notification in the same transaction as the update.
+An `adminRemarks`-only update is allowed while status is `PENDING` or `IN_PROGRESS`; it updates the current remarks without adding history or a notification. For `COMPLETED` or `REJECTED`, remarks-only updates return 409 `INVALID_STATUS_TRANSITION` with a closed-request message. Notification text is plain text and is truncated to 500 characters. Concurrent version conflicts roll back the status, history, and notification together.
 Response 200 request object.
 Errors 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, 409 `INVALID_STATUS_TRANSITION` or `CONCURRENT_MODIFICATION`.
 
