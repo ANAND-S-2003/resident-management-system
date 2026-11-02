@@ -63,13 +63,19 @@ Contrast ratios below use WCAG relative luminance calculations for foreground/ba
 | Light field border on canvas | `#64748b` | `#f8fafc` | 4.55:1 |
 | Dark primary text | `#f8fafc` | `#1e293b` | 13.98:1 |
 | Dark muted text | `#cbd5e1` | `#1e293b` | 9.85:1 |
+| Dark muted text on canvas | `#cbd5e1` | `#0f172a` | 12.02:1 |
 | Dark placeholder text | `#cbd5e1` | `#1e293b` | 9.85:1 |
 | Dark link | `#528ff0` | `#1e293b` | 4.56:1 |
+| Dark link on canvas | `#528ff0` | `#0f172a` | 5.56:1 |
+| Dark link hover | `#568ff0` | `#1e293b` | 4.59:1 |
 | Dark inline link vs adjacent text | `#528ff0` | `#f8fafc` | 3.07:1 |
 | Dark field border | `#94a3b8` | `#1e293b` | 5.71:1 |
 | Dark field border on canvas | `#94a3b8` | `#0f172a` | 6.96:1 |
 | Light focus ring | `#1d4ed8` | `#ffffff` | 6.70:1 |
+| Light focus ring on canvas | `#1d4ed8` | `#f8fafc` | 6.41:1 |
 | Dark focus ring | `#93c5fd` | `#1e293b` | 8.11:1 |
+| Dark focus ring on canvas | `#93c5fd` | `#0f172a` | 9.90:1 |
+| Focused skip-link text | `#1e3a8a` | `#ffffff` | 10.36:1 |
 | Light field error | `#b91c1c` | `#ffffff` | 6.47:1 |
 | Dark field error | `#fca5a5` | `#1e293b` | 7.71:1 |
 | Dark password toggle | `#bfdbfe` | `#1e293b` | 10.30:1 |
@@ -84,9 +90,9 @@ Contrast ratios below use WCAG relative luminance calculations for foreground/ba
 | Dark active navigation | `#eff6ff` | `#1e3a8a` | 9.52:1 |
 | Neutral badge | `#1e293b` | `#e2e8f0` | 11.87:1 |
 
-The field-border ratios exceed the 3:1 non-text component threshold against both surface and canvas. `PENDING` and `IN_PROGRESS` use warning and info badge pairs; `COMPLETED`, `REJECTED`, and `Overdue` use success and danger pairs. Disabled buttons retain full-contrast text; disabled state is conveyed through native disabled behavior and cursor without fading the label. Menu, drawer close, and password-toggle controls have at least 44x44 CSS pixel targets; toast dismissal is at least 24x24, and other controls are at least 40px tall. Focus-visible controls use a 3px outline in the scheme's focus color.
+The field-border ratios exceed the 3:1 non-text component threshold against both surface and canvas. `PENDING` and `IN_PROGRESS` use warning and info badge pairs; `COMPLETED`, `REJECTED`, and `Overdue` use success and danger pairs. The drawer backdrop contains no text; drawer content is on the opaque surface with the listed dark or light text pair. While the modal drawer is open, the underlying shell is inert and hidden from the accessibility tree so obscured page content cannot be focused or announced. Disabled buttons retain full-contrast text; disabled state is conveyed through native disabled behavior and cursor without fading the label. Menu, drawer close, and password-toggle controls have at least 44x44 CSS pixel targets; toast dismissal is at least 24x24, and other controls are at least 40px tall. Focus-visible controls use a 3px outline in the scheme's focus color.
 
-Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a repository-owned asset path in that configuration; the text wordmark is used when it is `null`. Do not add third-party branding or contact details to the UI. Browser axe checks scan Login, Register, resident and SUPER_ADMIN shell placeholders, and the mobile drawers in both color schemes, aggregating serious and critical findings. Keyboard tests cover the mobile drawer and route guards.
+Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a repository-owned asset path in that configuration; the text wordmark is used when it is `null`. Do not add third-party branding or contact details to the UI. Browser axe checks run as 12 independent tests: Login, Register, resident shell, resident mobile drawer, SUPER_ADMIN shell, and SUPER_ADMIN mobile drawer in both light and dark schemes. Each scan has a 90-second test timeout, disables motion, waits for the page and drawer to settle, and attaches the complete axe JSON result. Serious and critical findings include every affected node in the failure summary. Keyboard tests cover the mobile drawer and route guards.
 
 ## Run locally (Windows PowerShell)
 
@@ -125,4 +131,4 @@ npm run e2e:install
 npm run e2e
 ```
 
-The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. The axe test scans Login, Register, resident and SUPER_ADMIN shell placeholders, and both mobile drawers in light and dark schemes, then reports all serious or critical findings together. The suite requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.
+The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. Axe checks use one test per page state and color scheme (login, register, resident shell, resident mobile drawer, SUPER_ADMIN shell, SUPER_ADMIN mobile drawer), each with a 90-second timeout. Each scan attaches its full axe JSON result; failures list every serious or critical rule, impact, selector, and node summary. The suite requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.

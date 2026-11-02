@@ -81,10 +81,13 @@ describe('authentication pages', () => {
     await user.click(menuButton);
     const closeButton = screen.getByRole('button', { name: /Close navigation menu/ });
     expect(closeButton).toHaveFocus();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('main')).not.toBeInTheDocument();
     await user.keyboard('{Shift>}{Tab}{/Shift}');
     expect(within(screen.getByRole('dialog', { name: 'Mobile navigation' })).getByRole('link', { name: 'Account' })).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Mobile navigation' })).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toBeInTheDocument();
     expect(menuButton).toHaveFocus();
   });
 });

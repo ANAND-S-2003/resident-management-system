@@ -27,6 +27,12 @@ export function AppShell() {
   const items = navItems.filter((item) => user && item.roles.includes(user.role));
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
   useEffect(() => {
+    document.querySelectorAll<HTMLElement>('.skip-link, .topbar, .sidebar, .main-content').forEach((element) => {
+      if (drawerOpen) element.setAttribute('inert', '');
+      else element.removeAttribute('inert');
+    });
+  }, [drawerOpen]);
+  useEffect(() => {
     if (!drawerOpen) return;
     const previous = document.activeElement as HTMLElement | null;
     const drawer = document.querySelector<HTMLElement>('.mobile-drawer');
@@ -42,5 +48,5 @@ export function AppShell() {
     };
     document.addEventListener('keydown', onKey); return () => { document.removeEventListener('keydown', onKey); previous?.focus(); };
   }, [drawerOpen]);
-  return <div className="app-shell"><a className="skip-link" href="#main-content">Skip to main content</a><header className="topbar"><button type="button" className="menu-button" aria-label="☰ Open navigation menu" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}>☰</button><Link to={user?.role === ROLES[0] ? '/resident' : '/admin'}><Wordmark /></Link><div className="topbar-user"><span>{user?.fullName}<small>{user?.role}</small></span><Button variant="ghost" size="sm" onClick={() => logout()}>Sign out</Button></div></header><aside className="sidebar"><nav aria-label="Main navigation">{items.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>{item.label}</NavLink>)}</nav></aside>{drawerOpen && <div className="drawer-backdrop"><aside className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Mobile navigation"><div className="drawer-heading"><Wordmark /><button type="button" aria-label="× Close navigation menu" onClick={() => setDrawerOpen(false)}>×</button></div><nav aria-label="Mobile navigation menu">{items.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>{item.label}</NavLink>)}</nav></aside></div>}<main id="main-content" className="main-content"><Outlet /></main></div>;
+  return <div className="app-shell"><a className="skip-link" href="#main-content" aria-hidden={drawerOpen}>Skip to main content</a><header className="topbar" aria-hidden={drawerOpen}><button type="button" className="menu-button" aria-label="☰ Open navigation menu" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}>☰</button><Link to={user?.role === ROLES[0] ? '/resident' : '/admin'}><Wordmark /></Link><div className="topbar-user"><span>{user?.fullName}<small>{user?.role}</small></span><Button variant="ghost" size="sm" onClick={() => logout()}>Sign out</Button></div></header><aside className="sidebar" aria-hidden={drawerOpen}><nav aria-label="Main navigation">{items.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>{item.label}</NavLink>)}</nav></aside>{drawerOpen && <div className="drawer-backdrop"><aside className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Mobile navigation"><div className="drawer-heading"><Wordmark /><button type="button" aria-label="× Close navigation menu" onClick={() => setDrawerOpen(false)}>×</button></div><nav aria-label="Mobile navigation menu">{items.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>{item.label}</NavLink>)}</nav></aside></div>}<main id="main-content" className="main-content" aria-hidden={drawerOpen}><Outlet /></main></div>;
 }
