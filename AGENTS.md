@@ -21,3 +21,8 @@
 - After each task, run the relevant build and tests and report results honestly, including failures.
 - Always run `mvn clean verify` before reporting results; compile errors must fail the build.
 - Keep requirements, data model, and authoritative v1 API contract consistent; update docs when decisions change.
+- Never use `dangerouslySetInnerHTML`; render user-supplied text as text. ESLint must enforce `react/no-danger` as an error.
+- Frontend code must not contain secrets, tokens, or passwords in logs, URLs, error messages, or test snapshots; never log API response bodies in production code.
+- External links must use `rel="noopener noreferrer"`; encode user input in URL components.
+- Use TanStack Query for server state and centralized query keys; do not fetch data in `useEffect`.
+- Never use `localStorage`; browser session state may use namespaced `sessionStorage` with safe parsing and exception handling.

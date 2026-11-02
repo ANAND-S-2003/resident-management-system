@@ -56,10 +56,22 @@ If PowerShell 7 is installed, you can also run `pwsh -NoProfile -File scripts/sm
 
 From `backend/`, run `mvn clean verify` for the full suite, or `mvn clean verify -Dit.test=UserCatalogIT` to run only `UserCatalogIT`. The clean step removes stale compiled classes before compilation; the build must fail on any Java compile error. Database-backed integration tests require Docker.
 
+## Frontend (Windows PowerShell)
+
+Start the backend using the steps above, then from the repository root run:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Vite prints the development URL. To verify the frontend, run `npm run typecheck`, `npm run lint`, `npm run test -- --run`, and `npm run build` from `frontend/`. See [frontend architecture and routes](docs/frontend.md).
+
 ## Repository layout
 
 - `backend/` - Java backend skeleton and schema migrations
-- `frontend/` - intentionally empty for now
+- `frontend/` - React application foundation, authentication, and design system
 - `docs/` - requirements, data model, API, and environment guide
 - `.github/workflows/` - intentionally empty for now
 - `scripts/` - local environment helper scripts
