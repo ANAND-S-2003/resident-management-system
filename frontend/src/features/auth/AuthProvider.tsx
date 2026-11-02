@@ -64,8 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session) return;
-    const delay = Math.max(0, Date.parse(session.expiresAt) - Date.now());
-    const timer = window.setTimeout(() => logout(true), delay);
+    let timer: number;
+    const checkExpiry = () => {
+      const remaining = Date.parse(session.expiresAt) - Date.now();
+      if (!Number.isFinite(remaining) || remaining <= 0) logout(true);
+      else timer = window.setTimeout(checkExpiry, Math.min(remaining, 2_147_483_647));
+    };
+    const initialRemaining = Date.parse(session.expiresAt) - Date.now();
+    timer = window.setTimeout(checkExpiry, Number.isFinite(initialRemaining) ? Math.min(Math.max(0, initialRemaining), 2_147_483_647) : 0);
     return () => window.clearTimeout(timer);
   }, [session, logout]);
 

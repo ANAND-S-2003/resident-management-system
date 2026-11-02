@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TEST_API_ORIGIN } from './src/test/api-url';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
@@ -16,6 +17,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    environmentOptions: { jsdom: { url: TEST_API_ORIGIN } },
     setupFiles: './src/test/setup.ts',
     globals: true,
     css: true,

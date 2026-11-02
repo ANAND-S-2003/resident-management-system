@@ -8,11 +8,12 @@ describe('shared validation schemas', () => {
     expect(fullNameSchema.safeParse('😀'.repeat(121)).success).toBe(false);
   });
   it('enforces password characters, Unicode bytes and byte maximum', () => {
-    for (const value of ['Short1', 'Password', '12345678']) expect(passwordSchema.safeParse(value).success).toBe(false);
+    for (const value of ['Short1', 'Password', '12345678', 'a'.repeat(71) + '1A', '😀'.repeat(18) + 'A1']) {
+      const result = passwordSchema.safeParse(value);
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0]?.message).toBe(PASSWORD_MESSAGE);
+    }
     expect(passwordSchema.safeParse('a'.repeat(70) + '1A').success).toBe(true);
-    expect(passwordSchema.safeParse('a'.repeat(71) + '1A').success).toBe(false);
-    expect(passwordSchema.safeParse('😀'.repeat(18) + 'A1').success).toBe(false);
-    expect(passwordSchema.safeParse('Password1').error?.issues[0]?.message).toBe(PASSWORD_MESSAGE);
   });
   it('validates email and password confirmation', () => {
     expect(emailSchema.safeParse('not-an-email').success).toBe(false);

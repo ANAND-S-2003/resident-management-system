@@ -19,6 +19,7 @@ export default tseslint.config(
       'react/no-danger': 'error',
       'no-console': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
 );

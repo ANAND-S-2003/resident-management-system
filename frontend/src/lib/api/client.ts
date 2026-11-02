@@ -1,5 +1,6 @@
 import type { ApiErrorResponse, ErrorCode, FieldError } from './types';
 import { getCurrentToken } from './session-token';
+import { DEFAULT_API_BASE_URL } from './config';
 import { ERROR_CODES } from '@/lib/constants';
 
 export class ApiError extends Error {
@@ -18,7 +19,7 @@ export class ApiError extends Error {
   }
 }
 
-const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const apiBase = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
 let unauthorizedHandler: (() => void) | null = null;
 export function setUnauthorizedHandler(handler: (() => void) | null): void { unauthorizedHandler = handler; }
 

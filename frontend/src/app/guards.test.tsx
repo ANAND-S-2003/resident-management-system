@@ -6,13 +6,14 @@ import { http, HttpResponse } from 'msw';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { writeSession } from '@/features/auth/session';
 import { server } from '@/test/server';
+import { testApiUrl } from '@/test/api-url';
 import { RequireAuth, RequireRole } from './guards';
 
 function renderGuard(path: string, role?: 'USER' | 'ADMIN' | 'SUPER_ADMIN') {
   if (role) {
     const user = { id: 51, fullName: 'Test User', email: 'test@example.test', role, flatNumber: role === 'USER' ? 'A-51' : null, active: true };
-    writeSession({ token: 'guard-test-token', expiresAt: '2099-01-01T00:00:00Z', user });
-    server.use(http.get('http://localhost/api/v1/auth/me', () => HttpResponse.json(user)));
+    writeSession({ token: 'guard-test-token', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user });
+    server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.json(user)));
   }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><AuthProvider><Routes>

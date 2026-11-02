@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { Children, cloneElement, createContext, forwardRef, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import type { RequestStatus } from '@/lib/api/types';
 import { REQUEST_STATUSES } from '@/lib/constants';
 
@@ -17,7 +17,19 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 /** Label, hint and validation text with stable IDs for screen-reader descriptions. */
 export function FormField({ id, label, hint, error, required, children }: { id: string; label: string; hint?: string; error?: string; required?: boolean; children: ReactNode }) {
   const describedBy = [hint ? `${id}-hint` : '', error ? `${id}-error` : ''].filter(Boolean).join(' ') || undefined;
-  return <div className="form-field"><label htmlFor={id}>{label}{required && <span aria-hidden="true"> *</span>}</label>{children && <div className="field-control">{children}</div>}{hint && <p id={`${id}-hint`} className="field-hint">{hint}</p>}{error && <p id={`${id}-error`} className="field-error" role="alert">{error}</p>}</div>;
+  const controlProps = { id, 'aria-describedby': describedBy, 'aria-invalid': Boolean(error), required };
+  const wireControl = (node: ReactNode): ReactNode => {
+    if (!isValidElement<{ children?: ReactNode; id?: string; required?: boolean; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>(node)) return node;
+    const control = node.type === Input || node.type === Textarea || node.type === Select || (typeof node.type === 'string' && ['input', 'textarea', 'select'].includes(node.type));
+    if (control) {
+      const existingDescriptions = node.props['aria-describedby'];
+      const ariaDescribedBy = [existingDescriptions, describedBy].filter(Boolean).join(' ') || undefined;
+      return cloneElement(node, { ...controlProps, 'aria-describedby': ariaDescribedBy, required: required ?? node.props.required });
+    }
+    if (node.props.children) return cloneElement(node, { children: Children.map(node.props.children, wireControl) });
+    return node;
+  };
+  return <div className="form-field"><label htmlFor={id}>{label}{required && <span aria-hidden="true"> *</span>}</label><div className="field-control">{Children.map(children, wireControl)}</div>{hint && <p id={`${id}-hint`} className="field-hint">{hint}</p>}{error && <p id={`${id}-error`} className="field-error" role="alert">{error}</p>}</div>;
 }
 
 /** Surface for grouping related content. */
@@ -38,9 +50,10 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) { return <div className="page-header"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions}</div>; }
 /** Bounded list controls with item range, page-size selection, and previous/next actions. */
 export function Pagination({ page, size, totalElements, onPageChange, onSizeChange }: { page: number; size: number; totalElements: number; onPageChange: (page: number) => void; onSizeChange: (size: number) => void }) {
+  const pageSizeId = useId();
   const start = totalElements === 0 ? 0 : page * size + 1;
   const end = Math.min((page + 1) * size, totalElements);
-  return <nav className="pagination" aria-label="Pagination"><span>Showing {start}-{end} of {totalElements}</span><label>Page size <Select value={size} onChange={(event) => onSizeChange(Number(event.target.value))}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></Select></label><Button variant="secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Previous</Button><Button variant="secondary" disabled={end >= totalElements} onClick={() => onPageChange(page + 1)}>Next</Button></nav>;
+  return <nav className="pagination" aria-label="Pagination"><span>Showing {start}-{end} of {totalElements}</span><label htmlFor={pageSizeId}>Page size</label><Select id={pageSizeId} value={size} onChange={(event) => onSizeChange(Number(event.target.value))}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></Select><Button variant="secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Previous</Button><Button variant="secondary" disabled={end >= totalElements} onClick={() => onPageChange(page + 1)}>Next</Button></nav>;
 }
 
 /** Focus-trapped modal that restores focus and closes on Escape. */
