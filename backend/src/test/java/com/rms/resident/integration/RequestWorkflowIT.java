@@ -179,7 +179,7 @@ class RequestWorkflowIT {
 
     @Test void requestSearchUsesLiteralWildcardsAndCombinesFiltersAndPagination() throws Exception {
         var resident=user(Role.USER); var admin=user(Role.ADMIN); var service=service(admin);
-        String marker=UUID.randomUUID().toString().substring(0,8);
+        String marker=UniqueData.token().substring(0,8);
         resident.updateProfile("Pipe-"+marker+"% Owner",resident.getEmail(),"A_"+marker+"FLAT",clock.instant()); users.saveAndFlush(resident);
         var first=request(resident,service,RequestStatus.PENDING,LocalDate.now(clock).plusDays(1));
         var second=request(resident,service,RequestStatus.PENDING,LocalDate.now(clock).plusDays(2));

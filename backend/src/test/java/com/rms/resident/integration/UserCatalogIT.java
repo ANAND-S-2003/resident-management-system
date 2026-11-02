@@ -109,13 +109,14 @@ class UserCatalogIT {
 
     @Test void userCreateUpdateDuplicateValidationSearchSortAndPagination() throws Exception {
         UserAccount admin = user(Role.ADMIN, true); String auth = bearer(token(admin));
-        String email = "dupe-" + UUID.randomUUID() + "@example.test";
-        String body = createBody("Query 100% literal", email, "Q_1", "USER");
+        String token = UniqueData.token();
+        String email = "dupe-" + token + "@example.test";
+        String body = createBody("Query " + token + "% literal", email, "Q_1", "USER");
         String created = mvc.perform(post("/api/v1/users").header("Authorization", auth).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         assertThat(created).doesNotContain(PASSWORD, "passwordHash", "password_hash");
-        assertUserSearch(auth, Role.ADMIN, "%", 1);
-        assertUserSearch(auth, Role.ADMIN, "_", 0);
+        assertUserSearch(auth, Role.ADMIN, token + "%", 1);
+        assertUserSearch(auth, Role.ADMIN, token + "_", 0);
         mvc.perform(post("/api/v1/users").header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
                         .content(createBody("Duplicate", email.toUpperCase(Locale.ROOT), "Q_2", "USER")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DUPLICATE_RESOURCE"));
@@ -199,7 +200,7 @@ class UserCatalogIT {
                 .andExpect(status().isUnauthorized());
         mvc.perform(patch("/api/v1/services/1/activation").contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isUnauthorized());
-        String suffix = UUID.randomUUID().toString();
+        String suffix = UniqueData.token();
         String name = "WiFi " + suffix;
         String create = "{\"name\":\"" + name + "\",\"description\":\"Repair\"}";
         mvc.perform(post("/api/v1/services").header("Authorization", userAuth).contentType(MediaType.APPLICATION_JSON).content(create))
@@ -249,7 +250,7 @@ class UserCatalogIT {
         mvc.perform(post("/api/v1/services").header("Authorization", superAuth).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Super Service " + suffix + "\"}"))
                 .andExpect(status().isCreated());
-        mvc.perform(get("/api/v1/services").param("q", "%").header("Authorization", adminAuth))
+        mvc.perform(get("/api/v1/services").param("q", suffix + "%").header("Authorization", adminAuth))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
     }
 

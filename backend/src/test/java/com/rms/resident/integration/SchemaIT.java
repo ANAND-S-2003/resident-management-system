@@ -29,10 +29,11 @@ class SchemaIT {
 
     @Test
     void migrationsCreateSchemaAndSeedFiveServices() {
-        assertThat(jdbc.queryForList("SELECT name FROM services ORDER BY name", String.class))
-                .containsExactly("Cleaning", "Electrical", "Internet Repair", "Painting", "Plumbing");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE", Integer.class))
-                .isGreaterThanOrEqualTo(2);
+        assertThat(jdbc.queryForList("SELECT name FROM services WHERE active = TRUE AND name IN (?, ?, ?, ?, ?)", String.class,
+                "Plumbing", "Electrical", "Cleaning", "Painting", "Internet Repair"))
+                .contains("Plumbing", "Electrical", "Cleaning", "Painting", "Internet Repair");
+        assertThat(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success = TRUE", String.class))
+                .contains("1", "2");
     }
 
     @Test

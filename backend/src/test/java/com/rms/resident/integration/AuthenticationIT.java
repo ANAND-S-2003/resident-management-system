@@ -224,17 +224,16 @@ class AuthenticationIT {
 
     @Test
     void bootstrapIsIdempotentAndDoesNotModifyExistingSuperAdmin() throws Exception {
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE role = 'SUPER_ADMIN'", Integer.class)).isEqualTo(1);
-        jdbc.update("DELETE FROM users WHERE role = 'SUPER_ADMIN'");
+        UserAccount existing = users.findByRole(Role.SUPER_ADMIN).stream().findFirst().orElseThrow();
+        String originalName = existing.getFullName();
+        String originalEmail = existing.getEmail();
         var args = new org.springframework.boot.DefaultApplicationArguments(new String[0]);
         bootstrap.run(args);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE role = 'SUPER_ADMIN'", Integer.class)).isEqualTo(1);
-        jdbc.update("UPDATE users SET full_name = 'Existing Super Admin' WHERE role = 'SUPER_ADMIN'");
         bootstrap.run(args);
         bootstrap.run(args);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE role = 'SUPER_ADMIN'", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT full_name FROM users WHERE role = 'SUPER_ADMIN'", String.class))
-                .isEqualTo("Existing Super Admin");
+        UserAccount after = users.findById(existing.getId()).orElseThrow();
+        assertThat(after.getFullName()).isEqualTo(originalName);
+        assertThat(after.getEmail()).isEqualTo(originalEmail);
     }
 
     @Test

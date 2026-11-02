@@ -90,11 +90,13 @@ class DashboardContactIT {
         assertThat(superSummary.path("totalRequests").asLong()).withFailMessage(
                 "path=GET %s params={} actorRole=SUPER_ADMIN responseBody=%s",adminPath,superSummary).isEqualTo(superStatusSum);
         String activation="/api/v1/users/"+resident.getId()+"/activation";
+        // Check role authorization while this USER account is still active.
+        mvc.perform(get(adminPath).header("Authorization",bearer(resident))).andExpect(status().isForbidden());
         mvc.perform(patch(activation).header("Authorization",adminToken).contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
                 .andExpect(status().isOk());
         assertThat(dashboardCount(superToken,"activeResidents")).isEqualTo(beforeResidents-1);
         mvc.perform(get(adminPath)).andExpect(status().isUnauthorized());
-        mvc.perform(get(adminPath).header("Authorization",bearer(resident))).andExpect(status().isForbidden());
+        mvc.perform(get(adminPath).header("Authorization",bearer(resident))).andExpect(status().isUnauthorized());
     }
 
     @Test void contactSubmissionValidationAttributionRateLimitAndAdminReadWork() throws Exception {
@@ -197,7 +199,8 @@ class DashboardContactIT {
             try{matcher.match(result);}catch(Throwable failure){
                 String header=result.getRequest().getHeader("Authorization");String token=header!=null&&header.startsWith("Bearer ")?header.substring(7):null;
                 Role actor=token==null?null:tokenRoles.get(token);String query=result.getRequest().getQueryString();
-                String requestBody=new String(result.getRequest().getContentAsByteArray(),java.nio.charset.StandardCharsets.UTF_8);
+                byte[] requestBytes=result.getRequest().getContentAsByteArray();
+                String requestBody=requestBytes==null?"<no request body>":new String(requestBytes,java.nio.charset.StandardCharsets.UTF_8);
                 throw new AssertionError("Request assertion failed: path="+result.getRequest().getMethod()+" "+result.getRequest().getRequestURI()
                         +" params="+(query==null?"{}":query)+" actorRole="+(token==null?"ANONYMOUS":actor==null?"UNAUTHENTICATED":actor)+" requestBody="+requestBody
                         +" responseBody="+result.getResponse().getContentAsString(),failure);

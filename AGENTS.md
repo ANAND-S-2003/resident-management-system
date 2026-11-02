@@ -2,6 +2,7 @@
 
 - Keep commits small and focused. Use clear commit messages for coherent changes.
 - Every feature ships with appropriate automated tests (backend, frontend, and/or BDD as applicable).
+- Integration tests share one database. Never assert absolute counts or generic search results; always search for a unique token created by the test.
 - Never commit secrets. Read them from environment variables and document required variables in `.env.example` using dummy values only.
 - Define roles, request statuses, and other fixed identifiers once in shared enums/constants. Do not hardcode IDs, roles, or status strings elsewhere.
 - Validate all input on the backend. Trim strings before validating documented limits. Passwords: at least 8 characters, at most 72 UTF-8 bytes, at least one letter and one digit.
