@@ -129,10 +129,10 @@ async function prepareAxePage(page: Page, request: APIRequestContext, state: Axe
   await disableMotionForScan(page);
 
   if (mobile) {
-    await page.getByRole('button', { name: /Open navigation menu/ }).click();
+    await page.getByRole('button', { name: 'Open navigation menu' }).click();
     const drawer = page.getByRole('dialog', { name: 'Mobile navigation' });
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByRole('button', { name: /Close navigation menu/ })).toBeFocused();
+    await expect(drawer.getByRole('button', { name: 'Close navigation menu' })).toBeFocused();
     await page.waitForLoadState('networkidle');
   }
 }
@@ -222,10 +222,10 @@ test('mobile navigation traps focus, closes with Escape, and fits the viewport',
   const response = await signIn(page, resident.email, resident.password);
   expect(response.status(), 'Resident login response status').toBe(200);
   await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
-  const openButton = page.getByRole('button', { name: /Open navigation menu/ });
+  const openButton = page.getByRole('button', { name: 'Open navigation menu' });
   await openButton.click();
   const drawer = page.getByRole('dialog', { name: 'Mobile navigation' });
-  const closeButton = drawer.getByRole('button', { name: /Close navigation menu/ });
+  const closeButton = drawer.getByRole('button', { name: 'Close navigation menu' });
   await expect(closeButton).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(drawer.locator('a[href="/account"]')).toBeFocused();

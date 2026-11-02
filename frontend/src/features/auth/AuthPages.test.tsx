@@ -77,9 +77,9 @@ describe('authentication pages', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<ComingSoon title="Resident dashboard" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
     await screen.findByRole('heading', { name: 'Resident dashboard' });
-    const menuButton = screen.getByRole('button', { name: /Open navigation menu/ });
+    const menuButton = screen.getByRole('button', { name: 'Open navigation menu' });
     await user.click(menuButton);
-    const closeButton = screen.getByRole('button', { name: /Close navigation menu/ });
+    const closeButton = screen.getByRole('button', { name: 'Close navigation menu' });
     expect(closeButton).toHaveFocus();
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     expect(screen.queryByRole('main')).not.toBeInTheDocument();
@@ -88,6 +88,34 @@ describe('authentication pages', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Mobile navigation' })).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
-    expect(menuButton).toHaveFocus();
+    expect(screen.getByRole('banner')).not.toHaveAttribute('inert');
+    expect(screen.getByRole('banner')).not.toHaveAttribute('aria-hidden');
+    expect(screen.getByRole('main')).not.toHaveAttribute('inert');
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-hidden');
+    await waitFor(() => expect(menuButton).toHaveFocus());
+
+    await user.click(menuButton);
+    await user.click(screen.getByRole('button', { name: 'Close navigation menu' }));
+    await waitFor(() => expect(menuButton).toHaveFocus());
+
+    await user.click(menuButton);
+    await user.click(document.querySelector('.drawer-backdrop') as HTMLElement);
+    expect(screen.queryByRole('dialog', { name: 'Mobile navigation' })).not.toBeInTheDocument();
+    await waitFor(() => expect(menuButton).toHaveFocus());
+  });
+
+  it('moves focus to the new page heading when a drawer link navigates', async () => {
+    const user = userEvent.setup();
+    writeSession({ token: 'stored-token', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user: { id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true } });
+    server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.json({ id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true })));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<ComingSoon title="Resident dashboard" />} /><Route path="/resident/requests" element={<ComingSoon title="My requests" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
+    await screen.findByRole('heading', { name: 'Resident dashboard' });
+    await user.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+    await user.click(screen.getByRole('link', { name: 'My requests' }));
+    const heading = await screen.findByRole('heading', { name: 'My requests' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(screen.getByRole('banner')).not.toHaveAttribute('inert');
+    expect(screen.getByRole('banner')).not.toHaveAttribute('aria-hidden');
   });
 });

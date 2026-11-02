@@ -1,4 +1,4 @@
-import { Children, cloneElement, createContext, forwardRef, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { Children, cloneElement, createContext, forwardRef, isValidElement, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import type { RequestStatus } from '@/lib/api/types';
 import { REQUEST_STATUSES } from '@/lib/constants';
 
@@ -58,14 +58,30 @@ export function Pagination({ page, size, totalElements, onPageChange, onSizeChan
 
 /** Focus-trapped modal that restores focus and closes on Escape. */
 export function Dialog({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
-  const dialogRef = useRef<HTMLDivElement>(null); const previousFocus = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null); const previousFocus = useRef<HTMLElement | null>(null); const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const titleId = useId();
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
-    previousFocus.current = document.activeElement as HTMLElement;
-    const dialog = dialogRef.current; const focusable = dialog?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'); focusable?.focus();
+    previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const changedAttributes: Array<{ element: HTMLElement; inert: string | null; ariaHidden: string | null }> = [];
+    let branch: HTMLElement | null = dialogRef.current?.parentElement ?? null;
+    while (branch && branch !== document.body) {
+      const parent: HTMLElement | null = branch.parentElement;
+      if (!parent) break;
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling === branch || !(sibling instanceof HTMLElement)) continue;
+        changedAttributes.push({ element: sibling, inert: sibling.getAttribute('inert'), ariaHidden: sibling.getAttribute('aria-hidden') });
+        sibling.setAttribute('inert', '');
+        sibling.setAttribute('aria-hidden', 'true');
+      }
+      branch = parent;
+    }
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    (focusable ?? dialog)?.focus();
     const keyHandler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
       if (event.key === 'Tab' && dialog) {
         const items = Array.from(dialog.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter((item) => !item.hasAttribute('disabled'));
         if (!items.length) return;
@@ -73,10 +89,21 @@ export function Dialog({ open, title, onClose, children }: { open: boolean; titl
         else if (!event.shiftKey && document.activeElement === items[items.length - 1]) { event.preventDefault(); items[0]?.focus(); }
       }
     };
-    document.addEventListener('keydown', keyHandler); return () => { document.removeEventListener('keydown', keyHandler); previousFocus.current?.focus(); };
-  }, [open, onClose]);
+    document.addEventListener('keydown', keyHandler); return () => {
+      document.removeEventListener('keydown', keyHandler);
+      for (const { element, inert, ariaHidden } of changedAttributes) {
+        if (inert === null) element.removeAttribute('inert'); else element.setAttribute('inert', inert);
+        if (ariaHidden === null) element.removeAttribute('aria-hidden'); else element.setAttribute('aria-hidden', ariaHidden);
+      }
+      requestAnimationFrame(() => {
+        const opener = previousFocus.current;
+        const target = opener?.isConnected && !opener.closest('[inert]') ? opener : document.querySelector<HTMLElement>('main h1, main [role="heading"]');
+        if (target?.isConnected) { if (target !== opener) target.setAttribute('tabindex', '-1'); target.focus(); }
+      });
+    };
+  }, [open]);
   if (!open) return null;
-  return <div className="dialog-backdrop"><div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><h2 id={titleId}>{title}</h2>{children}</div></div>;
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseRef.current(); }}><div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><h2 id={titleId}>{title}</h2>{children}</div></div>;
 }
 /** Confirmation modal that keeps the same keyboard and focus guarantees as Dialog. */
 export function ConfirmDialog(props: { open: boolean; title: string; onClose: () => void; onConfirm: () => void; children: ReactNode }) { return <Dialog open={props.open} title={props.title} onClose={props.onClose}><div>{props.children}</div><div className="dialog-actions"><Button variant="secondary" onClick={props.onClose}>Cancel</Button><Button variant="danger" onClick={props.onConfirm}>Confirm</Button></div></Dialog>; }
@@ -86,7 +113,7 @@ interface ToastItem { id: number; message: string }
 export function ToastProvider({ children }: { children: ReactNode }) { const [items, setItems] = useState<ToastItem[]>([]); const nextId = useRef(0); const dismiss = useCallback((id: number) => setItems((current) => current.filter((item) => item.id !== id)), []);
   useEffect(() => { if (!items.length) return; const timers = items.map((item) => window.setTimeout(() => dismiss(item.id), 5000)); return () => timers.forEach(window.clearTimeout); }, [items, dismiss]);
   const toast = (message: string) => setItems((current) => [...current, { id: ++nextId.current, message }]);
-  return <ToastContext.Provider value={toast}>{children}<div className="toast-region" aria-live="polite" aria-relevant="additions text">{items.map((item) => <div className="toast" key={item.id}>{item.message}<button aria-label="× Dismiss notification" onClick={() => dismiss(item.id)}>×</button></div>)}</div></ToastContext.Provider>;
+  return <ToastContext.Provider value={toast}>{children}<div className="toast-region" aria-live="polite" aria-relevant="additions text">{items.map((item) => <div className="toast" key={item.id}>{item.message}<button aria-label="Dismiss notification" onClick={() => dismiss(item.id)}><span aria-hidden="true">×</span></button></div>)}</div></ToastContext.Provider>;
 }
 const ToastContext = createContext<((message: string) => void) | null>(null);
 export function useToast() { const toast = useContext(ToastContext); if (!toast) throw new Error('useToast must be used inside ToastProvider'); return toast; }
