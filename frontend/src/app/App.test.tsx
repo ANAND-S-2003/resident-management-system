@@ -49,7 +49,7 @@ describe('real application router composition', () => {
   it('restores a USER session and renders the resident shell', async () => {
     storeUser('USER');
     const { router } = renderProductionApp('/resident');
-    expect(await screen.findByRole('heading', { name: 'Resident dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Welcome, Test' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/resident');
   });
@@ -83,10 +83,11 @@ describe('real application router composition', () => {
     server.use(http.post(testApiUrl('/auth/login'), () => HttpResponse.json(loginResponse(60 * 60 * 1000))));
     const user = userEvent.setup();
     renderProductionApp('/login');
-    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'login-resident@example.test');
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: /Email/ }), 'login-resident@example.test');
     await user.type(screen.getByLabelText('Password *'), 'ValidPass123');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Resident dashboard' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Welcome, Login' })).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
   });
 
@@ -94,10 +95,11 @@ describe('real application router composition', () => {
     server.use(http.post(testApiUrl('/auth/login'), () => HttpResponse.json(loginResponse(2500))));
     const user = userEvent.setup();
     renderProductionApp('/login');
-    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'login-resident@example.test');
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: /Email/ }), 'login-resident@example.test');
     await user.type(screen.getByLabelText('Password *'), 'ValidPass123');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByRole('heading', { name: 'Resident dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Welcome, Login' })).toBeInTheDocument();
     expect(await screen.findByText('Your session has expired. Please sign in again.', {}, { timeout: 7000 })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 3000 })).toBeInTheDocument();
   }, 10_000);

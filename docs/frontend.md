@@ -9,14 +9,19 @@ frontend/
   src/
     app/                 Providers, router, guards, shell, pages
     components/ui/       Typed accessible design primitives
-    config/              Branding configuration
+    config/              Branding and application time zone
     features/auth/       Session provider, login/register, schemas' consumers
+    features/dashboard/  Resident dashboard and request-count summaries
+    features/requests/   Request APIs, query hooks, forms, lists, detail and status presentation
+    features/notifications/ Resident notification list and read actions
+    features/account/    Profile and change-password page
     lib/api/             Fetch client, session token bridge, DTO types
+    lib/dates.ts         Date-only and timestamp formatting helpers
     lib/validation/      Shared backend-aligned Zod schemas
     test/                Vitest setup and MSW handlers
 ```
 
-Feature screens for requests, services, residents, notifications, messages, and dashboard are explicitly placeholders until their implementation steps.
+Resident dashboard, request creation/list/detail/history, notifications, and account screens are implemented. Staff request, resident, service, message, and admin screens remain placeholders for later steps. The public contact page also remains a placeholder.
 
 ## Route map
 
@@ -24,10 +29,14 @@ Feature screens for requests, services, residents, notifications, messages, and 
 |---|---|---|
 | `/login`, `/register` | Anonymous | Authentication forms |
 | `/contact` | Public | Coming soon |
-| `/resident`, `/resident/requests`, `/resident/requests/new`, `/resident/requests/:id`, `/resident/notifications` | USER | Coming soon |
+| `/resident` | USER | Dashboard |
+| `/resident/requests` | USER | My requests (filters and pagination are stored in the URL query string) |
+| `/resident/requests/new` | USER | New service request |
+| `/resident/requests/:id` | USER | Request details and status history |
+| `/resident/notifications` | USER | Notifications, unread filter and read actions |
 | `/admin`, `/admin/requests`, `/admin/requests/:id`, `/admin/residents`, `/admin/services`, `/admin/messages` | ADMIN or SUPER_ADMIN | Coming soon |
 | `/admin/admins` | SUPER_ADMIN | Coming soon |
-| `/account` | Any authenticated role | Coming soon |
+| `/account` | Any authenticated role | Profile and change password |
 | `/forbidden` | Public error page | Access denied |
 
 Unauthenticated protected-route navigation remembers the requested location. On login it is used only when the signed-in role is allowed to access that route; otherwise navigation uses the role home (`USER` -> `/resident`; `ADMIN` and `SUPER_ADMIN` -> `/admin`).
@@ -45,6 +54,18 @@ If session validation fails for a network or server error other than 401, the ap
 The typed `fetch` wrapper sends JSON only when a body exists, accepts an `AbortSignal`, adds a bearer token from the current session, and parses the documented error envelope. `ApiError` carries the HTTP status, API code, safe message, field errors, and `Retry-After` seconds. Network and non-JSON responses map to `NETWORK_ERROR` and `UNKNOWN` without exposing raw response bodies. `INVALID_CREDENTIALS` stays on the login form; `UNAUTHENTICATED` on an authenticated request expires the session; `FORBIDDEN` remains a permission error; rate limits show the documented wait duration.
 
 DTO shapes, enum spellings, validation limits and error codes follow the authoritative contract in [api.md](api.md) and [requirements.md](requirements.md). The UI uses text rendering only for user-supplied data.
+
+## Resident request data and query behavior
+
+The shared query-key factory is in `src/lib/query-keys.ts`. Services, request lists (including every filter parameter), request details, request history, notification lists, unread counts, and the current user each have centralized keys. Request creation invalidates request-list and dashboard query data. Notification read mutations update cached list/count data optimistically, restore it on failure, and then invalidate the relevant queries.
+
+The request list keeps status, overdue, page, size, and sort in the URL. Invalid status/sort/page values fall back to safe defaults and page size is clamped to 1-100. Dashboard counts come from the same filtered request-list endpoint and totalElements values as the links on each card; residents do not call the staff dashboard endpoint.
+
+API request dates are date-only `YYYY-MM-DD` values in the community time zone. `src/config/time.ts` defines `APP_TIME_ZONE = "Asia/Kolkata"` and must match backend `RMS_TIMEZONE`. Date-only parsing and display never pass those strings through JavaScript's UTC date-string parser. The minimum date for a new request is computed with `Intl.DateTimeFormat.formatToParts` in that configured time zone. ISO UTC timestamps are parsed as instants and displayed with the browser's locale and time zone.
+
+Unread notification counts refresh every 60 seconds while the document is visible, do not poll in the background, and refresh when the window regains focus. The mark-all action shows a success toast after completion; no extra confirmation dialog is used.
+
+Shared status badges and request error presentation are in one module/component path. The overdue badge uses only the API's `overdue` field; the browser never recomputes overdue status. `ErrorState` exposes a friendly message and Retry action, while API codes and raw response bodies are kept out of resident-facing text.
 
 ## Design tokens and components
 
@@ -92,7 +113,7 @@ Contrast ratios below use WCAG relative luminance calculations for foreground/ba
 
 The field-border ratios exceed the 3:1 non-text component threshold against both surface and canvas. `PENDING` and `IN_PROGRESS` use warning and info badge pairs; `COMPLETED`, `REJECTED`, and `Overdue` use success and danger pairs. The drawer backdrop contains no text; drawer content is on the opaque surface with the listed dark or light text pair. While the modal drawer is open, the underlying shell is inert and hidden from the accessibility tree so obscured page content cannot be focused or announced. Disabled buttons retain full-contrast text; disabled state is conveyed through native disabled behavior and cursor without fading the label. Menu, drawer close, and password-toggle controls have at least 44x44 CSS pixel targets; toast dismissal is at least 24x24, and other controls are at least 40px tall. Focus-visible controls use a 3px outline in the scheme's focus color.
 
-Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a repository-owned asset path in that configuration; the text wordmark is used when it is `null`. Do not add third-party branding or contact details to the UI. Browser axe checks run as 12 independent tests: Login, Register, resident shell, resident mobile drawer, SUPER_ADMIN shell, and SUPER_ADMIN mobile drawer in both light and dark schemes. Each scan has a 90-second test timeout, disables motion, waits for the page and drawer to settle, and attaches the complete axe JSON result. Serious and critical findings include every affected node in the failure summary. Keyboard tests cover the mobile drawer and route guards.
+Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a repository-owned asset path in that configuration; the text wordmark is used when it is `null`. Do not add third-party branding or contact details to the UI. Browser axe checks run as independent tests: Login, Register, resident shell, resident mobile drawer, SUPER_ADMIN shell, and SUPER_ADMIN mobile drawer in both light and dark schemes, plus the resident dashboard, new-request form, request list, request detail, notifications, and account page in both schemes. Each scan has a 90-second test timeout, disables motion, waits for the page and drawer to settle, and attaches the complete axe JSON result. Serious and critical findings include every affected node in the failure summary. Keyboard tests cover the mobile drawer and route guards.
 
 ## Run locally (Windows PowerShell)
 

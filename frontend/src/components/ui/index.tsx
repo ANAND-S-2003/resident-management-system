@@ -1,6 +1,7 @@
 import { Children, cloneElement, createContext, forwardRef, isValidElement, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import type { RequestStatus } from '@/lib/api/types';
-import { REQUEST_STATUSES } from '@/lib/constants';
+import { presentRequestStatus } from '@/features/requests/status-presentation';
+import { friendlyErrorMessage } from '@/lib/api/friendly-errors';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; size?: 'sm' | 'md' | 'lg'; loading?: boolean };
 /** A consistent action button with visible keyboard focus and an announced loading state. */
@@ -37,7 +38,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 /** Compact semantic label used for counts and status. */
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' }) { return <span className={`badge badge-${tone}`}>{children}</span>; }
 /** Status is communicated with wording as well as a color; overdue is a separate label. */
-export function StatusBadge({ status, overdue = false }: { status: RequestStatus; overdue?: boolean }) { const tone = status === REQUEST_STATUSES[2] ? 'success' : status === REQUEST_STATUSES[3] ? 'danger' : status === REQUEST_STATUSES[1] ? 'info' : 'warning'; return <span className="status-group"><Badge tone={tone}>{status.replace('_', ' ')}</Badge>{overdue && <Badge tone="danger">Overdue</Badge>}</span>; }
+export function StatusBadge({ status, overdue = false }: { status: RequestStatus; overdue?: boolean }) { const presentation = presentRequestStatus(status, overdue); return <span className="status-group" role="group" aria-label={presentation.accessibleText}><Badge tone={presentation.tone}>{presentation.label}</Badge>{presentation.overdueLabel && <Badge tone="danger">{presentation.overdueLabel}</Badge>}</span>; }
 /** Inline message region with assertive announcement reserved for errors. */
 export function Alert({ tone = 'info', children }: { tone?: 'info' | 'success' | 'warning' | 'error'; children: ReactNode }) { return <div className={`alert alert-${tone}`} role={tone === 'error' ? 'alert' : 'status'}>{children}</div>; }
 /** Small animated progress indicator; its parent provides the accessible status label. */
@@ -46,6 +47,8 @@ export function Spinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) { return
 export function Skeleton({ className = '' }: { className?: string }) { return <div className={`skeleton ${className}`} aria-hidden="true" />; }
 /** Friendly empty collection state with a clear heading. */
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) { return <div className="empty-state"><h2>{title}</h2>{children && <p>{children}</p>}</div>; }
+/** Friendly recoverable failure state; raw API codes and server messages are never shown. */
+export function ErrorState({ error, onRetry, message }: { error: unknown; onRetry: () => void; message?: string }) { return <div className="error-state"><Alert tone="error">{message ?? friendlyErrorMessage(error)}</Alert><Button variant="secondary" onClick={onRetry}>Retry</Button></div>; }
 /** Standard page heading with optional description and actions. */
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) { return <div className="page-header"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions}</div>; }
 /** Bounded list controls with item range, page-size selection, and previous/next actions. */
@@ -53,7 +56,7 @@ export function Pagination({ page, size, totalElements, onPageChange, onSizeChan
   const pageSizeId = useId();
   const start = totalElements === 0 ? 0 : page * size + 1;
   const end = Math.min((page + 1) * size, totalElements);
-  return <nav className="pagination" aria-label="Pagination"><span>Showing {start}-{end} of {totalElements}</span><label htmlFor={pageSizeId}>Page size</label><Select id={pageSizeId} value={size} onChange={(event) => onSizeChange(Number(event.target.value))}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></Select><Button variant="secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Previous</Button><Button variant="secondary" disabled={end >= totalElements} onClick={() => onPageChange(page + 1)}>Next</Button></nav>;
+  return <nav className="pagination" aria-label="Pagination"><span>Showing {start}-{end} of {totalElements}</span><label htmlFor={pageSizeId}>Page size</label><Select id={pageSizeId} value={size} onChange={(event) => onSizeChange(Number(event.target.value))}>{![10, 20, 50, 100].includes(size) && <option value={size}>{size}</option>}<option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></Select><Button variant="secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Previous</Button><Button variant="secondary" disabled={end >= totalElements} onClick={() => onPageChange(page + 1)}>Next</Button></nav>;
 }
 
 /** Focus-trapped modal that restores focus and closes on Escape. */

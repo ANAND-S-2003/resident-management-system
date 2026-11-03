@@ -13,8 +13,13 @@ import { RegisterPage } from '@/features/auth/RegisterPage';
 
 function Placeholder({ title }: { title: string }) { return <ComingSoon title={title} />; }
 const lazyPage = (title: string) => lazy(async () => ({ default: (() => <Placeholder title={title} />) as ComponentType }));
-const ResidentHome = lazyPage('Resident dashboard'); const ResidentRequests = lazyPage('My requests'); const NewRequest = lazyPage('New request'); const RequestDetails = lazyPage('Request details'); const ResidentNotifications = lazyPage('Notifications');
-const AdminHome = lazyPage('Admin dashboard'); const AdminRequests = lazyPage('Requests'); const AdminRequestDetails = lazyPage('Request details'); const Residents = lazyPage('Residents'); const Services = lazyPage('Services'); const Messages = lazyPage('Messages'); const Admins = lazyPage('Admins'); const Account = lazyPage('Account'); const Contact = lazyPage('Contact');
+const ResidentHome = lazy(() => import('@/features/dashboard/ResidentDashboard').then((module) => ({ default: module.ResidentDashboard })));
+const ResidentRequests = lazy(() => import('@/features/requests/RequestListPage').then((module) => ({ default: module.RequestListPage })));
+const NewRequest = lazy(() => import('@/features/requests/RequestFormPage').then((module) => ({ default: module.RequestFormPage })));
+const RequestDetails = lazy(() => import('@/features/requests/RequestDetailPage').then((module) => ({ default: module.RequestDetailPage })));
+const ResidentNotifications = lazy(() => import('@/features/notifications/NotificationsPage').then((module) => ({ default: module.NotificationsPage })));
+const Account = lazy(() => import('@/features/account/AccountPage').then((module) => ({ default: module.AccountPage })));
+const AdminHome = lazyPage('Admin dashboard'); const AdminRequests = lazyPage('Requests'); const AdminRequestDetails = lazyPage('Request details'); const Residents = lazyPage('Residents'); const Services = lazyPage('Services'); const Messages = lazyPage('Messages'); const Admins = lazyPage('Admins'); const Contact = lazyPage('Contact');
 const fallback = <div className="route-loading" role="status"><Spinner />Loading page...</div>;
 
 export const appRoutes: RouteObject[] = [{

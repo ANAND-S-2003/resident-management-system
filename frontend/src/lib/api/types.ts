@@ -10,9 +10,13 @@ export type RegisterResponse = UserSummary;
 export interface LoginResponse { accessToken: string; tokenType: 'Bearer'; expiresAt: string; user: Omit<UserSummary, 'active' | 'createdAt' | 'updatedAt'> }
 export interface ChangePasswordRequest { currentPassword: string; newPassword: string }
 export interface ServiceDto { id: number; name: string; description: string | null; active: boolean }
+export type Service = ServiceDto;
 export interface ServiceRequestDto { id: number; resident: { id: number; fullName: string }; flatNumber: string; service: { id: number; name: string }; description: string; requestDate: string; expectedCompletionDate: string; status: RequestStatus; adminRemarks: string | null; version: number; overdue: boolean; createdAt: string; updatedAt: string }
+export type ServiceRequest = ServiceRequestDto;
 export interface RequestHistoryDto { fromStatus: RequestStatus | null; toStatus: RequestStatus; changedBy: { id: number; fullName: string }; remarks: string | null; createdAt: string }
+export type RequestHistoryEntry = RequestHistoryDto;
 export interface NotificationDto { id: number; requestId: number; type: NotificationType; message: string; read: boolean; createdAt: string; readAt: string | null }
+export type NotificationItem = NotificationDto;
 export interface DashboardSummary { byStatus: Record<RequestStatus, number>; overdueCount: number; totalRequests: number; activeResidents: number; activeAdmins?: number }
 export interface ContactQueryRequest { name: string; email: string; subject: string; message: string }
 export interface ContactQueryDto { id: number; submittedById: number | null; name: string; email: string; subject: string; message: string; createdAt: string }
@@ -31,6 +35,7 @@ export interface UnreadCountResponse { count: number }
 export interface DashboardStatusCounts { PENDING: number; IN_PROGRESS: number; COMPLETED: number; REJECTED: number }
 export interface HealthResponse { status: 'UP' | 'DOWN' }
 export interface RequestQuery { status?: RequestStatus; overdue?: boolean; q?: string; page?: number; size?: number; sort?: string }
+export interface RequestCreateRequest { serviceId: number; description: string; expectedCompletionDate: string }
 export interface UserQuery { role?: Role; active?: boolean; q?: string; page?: number; size?: number; sort?: string }
 export interface ServiceQuery { q?: string; active?: boolean; page?: number; size?: number; sort?: string }
 export interface NotificationQuery { unreadOnly?: boolean; page?: number; size?: number; sort?: string }

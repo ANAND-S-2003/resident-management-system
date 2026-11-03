@@ -5,7 +5,7 @@ Resident Management System (RMS), a role-based residential community service-req
 ## Planned stack
 
 - Backend: Java 17, Spring Boot 3.x, Maven 3.9+, Spring Security/JWT, Spring Data JPA, Flyway, MySQL 8.4 LTS
-- Frontend: React, Vite, React Router, Axios; Node.js 22 and npm
+- Frontend: React, Vite, React Router, TanStack Query, fetch; Node.js 22 and npm
 - Tests: JUnit 5/Testcontainers, Vitest/React Testing Library, Cucumber
 - Packaging and CI: Docker Desktop, Docker Compose, GitHub Actions
 
@@ -67,6 +67,16 @@ npm run dev
 ```
 
 Vite prints the development URL. To verify the frontend, run `npm run typecheck`, `npm run lint`, `npm run test -- --run`, and `npm run build` from `frontend/`. See [frontend architecture and routes](docs/frontend.md).
+
+The resident area includes the dashboard, request creation/list/detail and status history, notifications, and account settings. Staff feature screens remain placeholders. Run unit tests and the real-backend browser suite from `frontend/`:
+
+```powershell
+npm run test -- "--run"
+npm run e2e:install
+npm run e2e
+```
+
+The E2E suite requires the database and backend to be running as described above, plus `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD` loaded in that PowerShell session.
 
 ### Frontend browser tests (Windows PowerShell)
 

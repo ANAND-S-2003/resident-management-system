@@ -1,10 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Button } from '@/components/ui';
+import { Badge, Button } from '@/components/ui';
 import { branding } from '@/config/branding';
 import { useAuth } from '@/features/auth/AuthProvider';
 import type { Role } from '@/lib/api/types';
 import { ROLES } from '@/lib/constants';
+import { useUnreadCount } from '@/features/requests/hooks';
 
 interface NavItem { label: string; to: string; roles: Role[] }
 const navItems: NavItem[] = [
@@ -22,6 +23,15 @@ const navItems: NavItem[] = [
 ];
 
 function Wordmark() { return <span className="wordmark">{branding.logoSrc ? <img src={branding.logoSrc} alt={branding.appName} /> : <><strong>{branding.shortName}</strong><span>{branding.appName}</span></>}</span>; }
+function NavigationLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+  const unread = useUnreadCount(item.to === '/resident/notifications');
+  const className = ({ isActive }: { isActive: boolean }) => isActive ? 'nav-link active' : 'nav-link';
+  if (item.to === '/resident/notifications') {
+    const count = unread.data?.count ?? 0;
+    return <NavLink to={item.to} end className={className} aria-label={`Notifications, ${count} unread`} onClick={onNavigate}>Notifications{count > 0 && <> <Badge tone="info">{count}</Badge></>}</NavLink>;
+  }
+  return <NavLink to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={className} onClick={onNavigate}>{item.label}</NavLink>;
+}
 export function AppShell() {
   const { user, logout } = useAuth(); const [drawerOpen, setDrawerOpen] = useState(false); const location = useLocation();
   const openerRef = useRef<HTMLElement | null>(null);
@@ -79,11 +89,11 @@ export function AppShell() {
       <Link to={user?.role === ROLES[0] ? '/resident' : '/admin'}><Wordmark /></Link>
       <div className="topbar-user"><span>{user?.fullName}<small>{user?.role}</small></span><Button variant="ghost" size="sm" onClick={() => logout()}>Sign out</Button></div>
     </header>
-    <aside className="sidebar"><nav aria-label="Main navigation">{items.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>{item.label}</NavLink>)}</nav></aside>
+    <aside className="sidebar"><nav aria-label="Main navigation">{items.map((item) => <NavigationLink key={item.to} item={item} />)}</nav></aside>
     <div className="drawer-backdrop" role="presentation" hidden={!drawerOpen} onMouseDown={(event) => { if (event.target === event.currentTarget) closeDrawer(); }}>
       <aside id="mobile-navigation" className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Mobile navigation">
         <div className="drawer-heading"><Wordmark /><button type="button" aria-label="Close navigation menu" onClick={() => closeDrawer()}><span aria-hidden="true">×</span></button></div>
-        <nav aria-label="Mobile navigation menu">{items.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'} onClick={() => closeDrawer(true)}>{item.label}</NavLink>)}</nav>
+        <nav aria-label="Mobile navigation menu">{items.map((item) => <NavigationLink key={item.to} item={item} onNavigate={() => closeDrawer(true)} />)}</nav>
       </aside>
     </div>
     <main id="main-content" className="main-content"><Outlet /></main>
