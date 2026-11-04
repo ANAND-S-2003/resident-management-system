@@ -119,15 +119,30 @@ test('a resident visiting /admin sees Forbidden', async ({ page, request }) => {
 });
 
 test('browser Back after logout does not reveal protected content', async ({ page, request }) => {
+  const authenticatedRequestsAfterSignOut: string[] = [];
+  let signedOut = false;
+  page.on('request', async (browserRequest) => {
+    if (!signedOut || !new URL(browserRequest.url()).pathname.startsWith('/api/v1/')) return;
+    const headers = await browserRequest.allHeaders();
+    if (headers.authorization?.startsWith('Bearer ')) authenticatedRequestsAfterSignOut.push(browserRequest.url());
+  });
   const resident = await createResident(request);
   const response = await signIn(page, resident.email, resident.password);
   expect(response.status(), 'Resident login response status').toBe(200);
   await expect(mainHeading(page, residentDashboardHeading(resident.fullName))).toBeVisible();
   await signOut(page);
+  signedOut = true;
   await page.goBack();
+  await expect(mainHeading(page, residentDashboardHeading(resident.fullName))).toHaveCount(0);
+  await page.goto('/resident');
   await expect(page).toHaveURL(/\/login$/, { timeout: 10_000 });
   await expect(mainHeading(page, headings.login)).toBeVisible();
-  await expect(mainHeading(page, residentDashboardHeading(resident.fullName))).toHaveCount(0);
+  await expect(mainContent(page).locator('input[name="email"]')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('rms.session.v1')),
+    { message: 'Session storage should remain empty after Back and protected-route navigation', timeout: 10_000 },
+  ).toBeNull();
+  await page.waitForLoadState('networkidle');
+  expect(authenticatedRequestsAfterSignOut, 'Protected API requests after sign-out').toEqual([]);
 });
 
 test('mobile navigation traps focus, closes with Escape, and fits the viewport', async ({ page, request }) => {

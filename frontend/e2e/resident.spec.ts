@@ -139,6 +139,12 @@ test('resident request lifecycle, notifications, ownership, and password change 
   expect((await changeResponse).status(), 'Change password response status').toBe(204);
   await expect(page.locator('.toast-region').getByText('Password changed successfully. You are still signed in.', { exact: true })).toBeVisible();
   await signOut(page);
+
+  const oldPasswordResponse = await signIn(page, resident.email, resident.password);
+  expect(oldPasswordResponse.status(), 'Old-password login response status').toBe(401);
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(mainContent(page).getByText('Invalid email or password', { exact: true })).toBeVisible();
+
   const finalLoginResponse = await signIn(page, resident.email, newPassword);
   expect(finalLoginResponse.status(), 'Login with changed password response status').toBe(200);
   await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
