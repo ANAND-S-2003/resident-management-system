@@ -21,10 +21,12 @@ class ApplicationContextIT {
     @Autowired ApplicationContext applicationContext;
     @Autowired @Qualifier("loginRateLimiter") RateLimiter loginRateLimiter;
     @Autowired @Qualifier("registerRateLimiter") RateLimiter registerRateLimiter;
+    @Autowired @Qualifier("contactRateLimiter") RateLimiter contactRateLimiter;
 
     @Test
     void fullApplicationContextStartsWithDistinctConfiguredRateLimiters() {
         assertThat(applicationContext).isNotNull();
         assertThat(loginRateLimiter).isNotSameAs(registerRateLimiter);
+        assertThat(contactRateLimiter).isNotSameAs(registerRateLimiter);
     }
 }

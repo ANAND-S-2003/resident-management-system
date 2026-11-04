@@ -21,7 +21,7 @@ class SuperAdminBootstrapTest {
         UserAccountRepository users = mock(UserAccountRepository.class);
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         RmsProperties properties = new RmsProperties("jwt-secret-that-is-at-least-32-bytes", "root@example.test",
-                "Root Admin", "Bootstrap123", "Asia/Kolkata", List.of(), false);
+                "Root Admin", "Bootstrap123", "Asia/Kolkata", List.of(), false, 5, 10, 5);
         when(users.existsByRole(Role.SUPER_ADMIN)).thenReturn(false, true);
         when(encoder.encode("Bootstrap123")).thenReturn("encoded-password");
         when(users.saveAndFlush(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));

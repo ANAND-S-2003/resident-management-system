@@ -77,6 +77,6 @@ class JwtServiceTest {
 
     private static JwtService service(String secret, MutableClock clock) {
         return new JwtService(new RmsProperties(secret, "root@example.test", "Test Admin", "TestPassword123",
-                "UTC", List.of(), false), clock);
+                "UTC", List.of(), false, 5, 10, 5), clock);
     }
 }

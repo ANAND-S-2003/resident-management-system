@@ -3,6 +3,8 @@ package com.rms.resident.common.config;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Size;
 import com.rms.resident.common.validation.PasswordPolicy;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -22,7 +24,10 @@ public record RmsProperties(
         @NotBlank(message = "RMS_SUPERADMIN_PASSWORD is required") String superadminPassword,
         @DefaultValue("Asia/Kolkata") String timezone,
         @DefaultValue List<String> corsAllowedOrigins,
-        @DefaultValue("false") boolean trustProxy
+        @DefaultValue("false") boolean trustProxy,
+        @DefaultValue("5") @Min(value = 1, message = "RMS_RATE_LIMIT_LOGIN_MAX must be between 1 and 10000") @Max(value = 10000, message = "RMS_RATE_LIMIT_LOGIN_MAX must be between 1 and 10000") int rateLimitLoginMax,
+        @DefaultValue("10") @Min(value = 1, message = "RMS_RATE_LIMIT_REGISTER_MAX must be between 1 and 10000") @Max(value = 10000, message = "RMS_RATE_LIMIT_REGISTER_MAX must be between 1 and 10000") int rateLimitRegisterMax,
+        @DefaultValue("5") @Min(value = 1, message = "RMS_RATE_LIMIT_CONTACT_MAX must be between 1 and 10000") @Max(value = 10000, message = "RMS_RATE_LIMIT_CONTACT_MAX must be between 1 and 10000") int rateLimitContactMax
 ) {
     public RmsProperties {
         if (superadminEmail != null) superadminEmail = superadminEmail.trim().toLowerCase(java.util.Locale.ROOT);

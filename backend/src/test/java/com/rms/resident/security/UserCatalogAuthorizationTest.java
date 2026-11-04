@@ -106,7 +106,7 @@ class UserCatalogAuthorizationTest {
         @Bean Clock clock() { return Clock.systemUTC(); }
         @Bean RmsProperties rmsProperties() {
             return new RmsProperties("mvc-test-jwt-secret-with-at-least-32-bytes", "bootstrap@example.test",
-                    "Bootstrap Admin", "Bootstrap123", "UTC", List.of(), false);
+                    "Bootstrap Admin", "Bootstrap123", "UTC", List.of(), false, 5, 10, 5);
         }
         @Bean ClientIpResolver clientIpResolver(RmsProperties properties) { return new ClientIpResolver(properties); }
         @Bean("registerRateLimiter") RateLimiter registerRateLimiter(Clock clock) { return new RateLimiter(clock); }

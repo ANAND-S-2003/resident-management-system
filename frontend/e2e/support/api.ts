@@ -40,6 +40,13 @@ export interface ResidentScenario {
 }
 
 let superAdminSessionPromise: Promise<BrowserAuthSession> | null = null;
+let readOnlyResidentPromise: Promise<TestResident> | null = null;
+
+export function assertNotRateLimited(status: number, action: string): void {
+  if (status === 429) {
+    throw new Error(`Rate limit reached during ${action}: restart the backend or start it with scripts/start-backend-for-e2e.ps1`);
+  }
+}
 
 export function residentCredentials(): TestResident {
   const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
@@ -76,24 +83,28 @@ export async function superAdminName(): Promise<string> {
   return name;
 }
 
-export async function createResident(request: APIRequestContext): Promise<TestResident> {
-  const resident = residentCredentials();
-  const admin = await superAdminSession(request);
-  const response = await request.post(`${backendApi}/users`, {
-    headers: { Authorization: `Bearer ${admin.token}` },
-    data: { ...resident, role: 'USER' },
-  });
-  expect(response.status(), 'Create unique resident test account').toBe(201);
-  return resident;
+export async function createReadOnlyResident(request: APIRequestContext): Promise<TestResident> {
+  if (!readOnlyResidentPromise) {
+    readOnlyResidentPromise = (async () => {
+      const resident = residentCredentials();
+      const response = await request.post(`${backendApi}/auth/register`, { data: resident });
+      assertNotRateLimited(response.status(), 'read-only resident registration');
+      expect(response.status(), 'Register shared read-only resident test account').toBe(201);
+      return resident;
+    })();
+  }
+  return readOnlyResidentPromise;
 }
 
 export async function registerResident(request: APIRequestContext, resident: TestResident): Promise<void> {
   const response = await request.post(`${backendApi}/auth/register`, { data: resident });
+  assertNotRateLimited(response.status(), 'resident registration');
   expect(response.status(), 'Register unique resident test account').toBe(201);
 }
 
 export async function loginWithApi(request: APIRequestContext, email: string, password: string): Promise<BrowserAuthSession> {
   const response = await request.post(`${backendApi}/auth/login`, { data: { email, password } });
+  assertNotRateLimited(response.status(), 'API login');
   expect(response.status(), 'API login response status').toBe(200);
   const body = await response.json() as BackendLoginResponse;
   return { token: body.accessToken, expiresAt: body.expiresAt, user: { ...body.user, active: true } };
@@ -106,7 +117,7 @@ export async function installSession(page: Page, session: BrowserAuthSession): P
 }
 
 export async function createResidentScenario(request: APIRequestContext, withRequest: boolean): Promise<ResidentScenario> {
-  const resident = await createResident(request);
+  const resident = await createReadOnlyResident(request);
   const session = await loginWithApi(request, resident.email, resident.password);
   if (!withRequest) return { resident, session, requestId: null, serviceName: null };
 

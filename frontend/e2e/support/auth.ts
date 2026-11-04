@@ -1,6 +1,7 @@
 import { expect, type Page, type Response as PlaywrightResponse } from '@playwright/test';
 import { appHeader, mainContent } from './landmarks';
 import { headings } from './headings';
+import { assertNotRateLimited } from './api';
 
 export async function signIn(page: Page, email: string, password: string): Promise<PlaywrightResponse> {
   await page.goto('/login');
@@ -30,7 +31,9 @@ export async function signIn(page: Page, email: string, password: string): Promi
     response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/login'),
   );
   await authForm.getByRole('button', { name: 'Sign in', exact: true }).click();
-  return loginResponse;
+  const response = await loginResponse;
+  assertNotRateLimited(response.status(), 'sign-in');
+  return response;
 }
 
 export async function signInSuperAdmin(page: Page): Promise<PlaywrightResponse> {

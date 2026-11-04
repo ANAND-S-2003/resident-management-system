@@ -33,7 +33,7 @@ export function ResidentDashboard() {
     <section className="resident-stat-grid" aria-label="Request summaries">
       {statusCards.map((card, index) => <Link className="resident-stat-link" key={card.status} to={`/resident/requests?status=${card.status}`}><Card className="resident-stat"><StatusBadge status={card.status} /><strong>{countByStatus[index]}</strong><span>{card.label} requests</span></Card></Link>)}
       <Link className="resident-stat-link" to="/resident/requests?overdue=true"><Card className="resident-stat"><StatusBadge status={REQUEST_STATUSES[0]} overdue /><strong>{overdue.data?.totalElements ?? 0}</strong><span>Overdue requests</span></Card></Link>
-      <Link className="resident-stat-link" aria-label={`Notifications, ${unread.data?.count ?? 0} unread`} to="/resident/notifications"><Card className="resident-stat"><span>Notifications</span><strong>{unread.data?.count ?? 0}</strong><span>Unread</span></Card></Link>
+      <Link className="resident-stat-link" to="/resident/notifications"><Card className="resident-stat"><span>Notifications</span><strong>{unread.data?.count ?? 0}</strong><span>Unread</span></Card></Link>
     </section>
     <section className="recent-requests" aria-labelledby="recent-requests-heading">
       <div className="section-heading"><h2 id="recent-requests-heading">Recent requests</h2><Link to="/resident/requests">View all</Link></div>

@@ -45,4 +45,7 @@ rms:
   timezone: ${RMS_TIMEZONE:Asia/Kolkata}
   cors-allowed-origins: ${RMS_CORS_ALLOWED_ORIGINS:}
   trust-proxy: ${RMS_TRUST_PROXY:false}
+  rate-limit-login-max: ${RMS_RATE_LIMIT_LOGIN_MAX:5}
+  rate-limit-register-max: ${RMS_RATE_LIMIT_REGISTER_MAX:10}
+  rate-limit-contact-max: ${RMS_RATE_LIMIT_CONTACT_MAX:5}
 

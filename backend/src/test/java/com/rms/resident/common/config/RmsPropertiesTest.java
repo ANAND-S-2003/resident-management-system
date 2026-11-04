@@ -27,7 +27,35 @@ class RmsPropertiesTest {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(RmsProperties.class).timezone()).isEqualTo("Asia/Kolkata");
             assertThat(context.getBean(RmsProperties.class).trustProxy()).isFalse();
+            assertThat(context.getBean(RmsProperties.class).rateLimitLoginMax()).isEqualTo(5);
+            assertThat(context.getBean(RmsProperties.class).rateLimitRegisterMax()).isEqualTo(10);
+            assertThat(context.getBean(RmsProperties.class).rateLimitContactMax()).isEqualTo(5);
         });
+    }
+
+    @Test
+    void acceptsConfiguredRateLimitOverrides() {
+        runner.withPropertyValues(validProperties())
+                .withPropertyValues("rms.rate-limit-login-max=12", "rms.rate-limit-register-max=42", "rms.rate-limit-contact-max=99")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    RmsProperties properties = context.getBean(RmsProperties.class);
+                    assertThat(properties.rateLimitLoginMax()).isEqualTo(12);
+                    assertThat(properties.rateLimitRegisterMax()).isEqualTo(42);
+                    assertThat(properties.rateLimitContactMax()).isEqualTo(99);
+                });
+    }
+
+    @Test
+    void rejectsRateLimitOverridesOutsideOneToTenThousand() {
+        runner.withPropertyValues(validProperties()).withPropertyValues("rms.rate-limit-register-max=10001")
+                .run(context -> assertFailureMentions(context, "RMS_RATE_LIMIT_REGISTER_MAX"));
+    }
+
+    @Test
+    void rejectsZeroRateLimitOverride() {
+        runner.withPropertyValues(validProperties()).withPropertyValues("rms.rate-limit-login-max=0")
+                .run(context -> assertFailureMentions(context, "RMS_RATE_LIMIT_LOGIN_MAX"));
     }
 
     @Test

@@ -78,6 +78,8 @@ npm run e2e
 
 The E2E suite requires the database and backend to be running as described above, plus `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD` loaded in that PowerShell session.
 
+Playwright creates uniquely named residents. Read-only resident scenarios reuse one API-registered account per worker; UI registration remains covered by the registration flows. To repeat the suite without the documented registration/login limits interrupting local runs, start the backend in a separate repository-root PowerShell window with `.scripts\start-backend-for-e2e.ps1`. It loads `.env`, starts the database and sets `RMS_RATE_LIMIT_REGISTER_MAX` and `RMS_RATE_LIMIT_LOGIN_MAX` to `1000` for that backend process only. This override is for local E2E runs only, never production. Restarting the backend also resets the in-memory counters; no rate-limit defaults are changed.
+
 ### Frontend browser tests (Windows PowerShell)
 
 First start MySQL and the backend using the steps in [Backend local run](#backend-local-run-windows-powershell). Keep that window running. In a second PowerShell window from the repository root, load the same environment so the Playwright tests can sign in as the configured super admin:

@@ -30,6 +30,6 @@ class ClientIpResolverTest {
 
     private static RmsProperties properties(boolean trustProxy) {
         return new RmsProperties("01234567890123456789012345678901", "root@example.test",
-                "Test Super Admin", "TestPassword123", "Asia/Kolkata", List.of(), trustProxy);
+                "Test Super Admin", "TestPassword123", "Asia/Kolkata", List.of(), trustProxy, 5, 10, 5);
     }
 }

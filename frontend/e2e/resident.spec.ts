@@ -4,6 +4,7 @@ import { expect, test } from './fixtures';
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test';
 import {
   addDaysToDateOnly,
+  assertNotRateLimited,
   backendApi,
   createResidentScenario,
   installSession,
@@ -36,8 +37,12 @@ test('resident request lifecycle, notifications, ownership, and password change 
   const registrationResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/register'));
   const registrationLoginResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/login'));
   await authForm.getByRole('button', { name: 'Create account', exact: true }).click();
-  expect((await registrationResponse).status(), 'Resident registration response status').toBe(201);
-  expect((await registrationLoginResponse).status(), 'Automatic login after registration status').toBe(200);
+  const registrationResult = await registrationResponse;
+  assertNotRateLimited(registrationResult.status(), 'UI resident registration');
+  expect(registrationResult.status(), 'Resident registration response status').toBe(201);
+  const registrationLoginResult = await registrationLoginResponse;
+  assertNotRateLimited(registrationLoginResult.status(), 'automatic login after registration');
+  expect(registrationLoginResult.status(), 'Automatic login after registration status').toBe(200);
   await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
   await waitForHeading(page, residentDashboardHeading(resident.fullName));
 

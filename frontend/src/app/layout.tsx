@@ -28,7 +28,7 @@ function NavigationLink({ item, onNavigate }: { item: NavItem; onNavigate?: () =
   const className = ({ isActive }: { isActive: boolean }) => isActive ? 'nav-link active' : 'nav-link';
   if (item.to === '/resident/notifications') {
     const count = unread.data?.count ?? 0;
-    return <NavLink to={item.to} end className={className} aria-label={`Notifications, ${count} unread`} onClick={onNavigate}>Notifications{count > 0 && <> <Badge tone="info">{count}</Badge></>}</NavLink>;
+    return <NavLink to={item.to} end className={className} onClick={onNavigate}>Notifications{count > 0 && <> <span aria-hidden="true"><Badge tone="info">{count}</Badge></span></>}<span className="sr-only">, {count} unread</span></NavLink>;
   }
   return <NavLink to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={className} onClick={onNavigate}>{item.label}</NavLink>;
 }

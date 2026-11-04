@@ -80,6 +80,31 @@ describe('resident screens in the production app composition', () => {
     expect(screen.getByRole('link', { name: 'Create your first request' })).toHaveAttribute('href', '/resident/requests/new');
   });
 
+  it('keeps visible dashboard card text inside each link accessible name', async () => {
+    renderApp('/resident');
+    const notificationsCard = await screen.findByRole('link', { name: 'Notifications 0 Unread' });
+    expect(notificationsCard).not.toHaveAttribute('aria-label');
+    expect(notificationsCard).toHaveAccessibleName('Notifications 0 Unread');
+    const statLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('.resident-stat-link'));
+    expect(statLinks).toHaveLength(6);
+    for (const link of statLinks) {
+      expect(link).not.toHaveAttribute('aria-label');
+      expect(link).toHaveAccessibleName();
+    }
+
+    const labelledControls = Array.from(document.querySelectorAll<HTMLElement>('a[aria-label], button[aria-label]'));
+    for (const control of labelledControls) {
+      const label = control.getAttribute('aria-label')?.toLocaleLowerCase() ?? '';
+      const visibleText = (node: Node): string => {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+        if (node instanceof HTMLElement && (node.getAttribute('aria-hidden') === 'true' || node.classList.contains('sr-only'))) return '';
+        return Array.from(node.childNodes).map(visibleText).join(' ');
+      };
+      const text = visibleText(control).replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+      if (text) expect(label, `aria-label should contain the visible control text: ${text}`).toContain(text);
+    }
+  });
+
   it('submits only allowed request fields and renders request and plain-array history text literally', async () => {
     const user = userEvent.setup();
     const rawText = '<script>alert(1)</script> <img src=x onerror=alert(1)>';
@@ -153,7 +178,10 @@ describe('resident screens in the production app composition', () => {
       http.patch(testApiUrl('/notifications/read-all'), () => { readAll = true; return new HttpResponse(null, { status: 204 }); }),
     );
     renderApp('/resident/notifications');
-    expect(await screen.findByRole('link', { name: 'Notifications, 2 unread' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Notifications', level: 1 })).toBeInTheDocument();
+    const notificationNav = document.querySelector('nav[aria-label="Main navigation"] a[href="/resident/notifications"]');
+    expect(notificationNav).not.toBeNull();
+    expect(notificationNav!).toHaveAccessibleName(/Notifications.*2.*unread/);
     expect(await screen.findAllByText('New')).toHaveLength(2);
     expect(document.querySelector('.notification-unread .sr-only')?.textContent).toBe('Unread: ');
     expect(screen.getByText('<script>literal message</script>')).toBeInTheDocument();

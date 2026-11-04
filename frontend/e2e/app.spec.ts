@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './fixtures';
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test';
-import { createResident, installSession, loginWithApi, residentCredentials, superAdminSession } from './support/api';
+import { assertNotRateLimited, createReadOnlyResident, installSession, loginWithApi, residentCredentials, superAdminSession } from './support/api';
 import { signIn, signInSuperAdmin, signOut } from './support/auth';
 import { axePageHeading, headings, residentDashboardHeading } from './support/headings';
 import { appHeader, mainContent, mainHeading, mobileDrawer, navigationLink } from './support/landmarks';
@@ -44,7 +44,7 @@ async function prepareAxePage(page: Page, request: APIRequestContext, state: Axe
 }
 
 async function loginWithResident(request: APIRequestContext) {
-  const resident = await createResident(request);
+  const resident = await createReadOnlyResident(request);
   return loginWithApi(request, resident.email, resident.password);
 }
 
@@ -82,7 +82,9 @@ test('a resident registers, signs out, and signs back in', async ({ page }) => {
   const registrationResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/register'));
   const loginResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/login'));
   await authForm.getByRole('button', { name: 'Create account', exact: true }).click();
-  expect((await registrationResponse).status(), 'Resident registration response status').toBe(201);
+  const registrationResult = await registrationResponse;
+  assertNotRateLimited(registrationResult.status(), 'UI resident registration');
+  expect(registrationResult.status(), 'Resident registration response status').toBe(201);
   expect((await loginResponse).status(), 'Resident login response status').toBe(200);
   await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
   const dashboardHeading = residentDashboardHeading(resident.fullName);
@@ -95,7 +97,7 @@ test('a resident registers, signs out, and signs back in', async ({ page }) => {
 
 test('wrong password shows the generic login error', async ({ page, request }) => {
   const browserFailures = monitorExpectedBrowserFailures(page);
-  const resident = await createResident(request);
+  const resident = await createReadOnlyResident(request);
   const response = await signIn(page, resident.email, 'WrongPassword123');
   expect(response.status(), 'Wrong-password login response status').toBe(401);
   await expect(mainContent(page).getByText('Invalid email or password', { exact: true })).toBeVisible();
@@ -109,7 +111,7 @@ test('SUPER_ADMIN signs in and sees the Admins navigation item', async ({ page }
 });
 
 test('a resident visiting /admin sees Forbidden', async ({ page, request }) => {
-  const resident = await createResident(request);
+  const resident = await createReadOnlyResident(request);
   const response = await signIn(page, resident.email, resident.password);
   expect(response.status(), 'Resident login response status').toBe(200);
   await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
@@ -125,7 +127,7 @@ test('browser Back after logout does not reveal protected content', async ({ pag
     const headers = await browserRequest.allHeaders();
     if (headers.authorization?.startsWith('Bearer ')) authenticatedRequestsAfterSignOut.push(browserRequest.url());
   });
-  const resident = await createResident(request);
+  const resident = await createReadOnlyResident(request);
   const response = await signIn(page, resident.email, resident.password);
   expect(response.status(), 'Resident login response status').toBe(200);
   await expect(mainHeading(page, residentDashboardHeading(resident.fullName))).toBeVisible();
@@ -146,7 +148,7 @@ test('browser Back after logout does not reveal protected content', async ({ pag
 
 test('mobile navigation traps focus, closes with Escape, and fits the viewport', async ({ page, request }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  const resident = await createResident(request);
+  const resident = await createReadOnlyResident(request);
   const response = await signIn(page, resident.email, resident.password);
   expect(response.status(), 'Resident login response status').toBe(200);
   await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
