@@ -1,10 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, redactDiagnosticText } from './fixtures';
+import { expect, test } from './fixtures';
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test';
 import { createResident, installSession, loginWithApi, residentCredentials, superAdminSession } from './support/api';
 import { signIn, signInSuperAdmin, signOut } from './support/auth';
 import { axePageHeading, headings, residentDashboardHeading } from './support/headings';
 import { appHeader, mainContent, mainHeading, mobileDrawer, navigationLink } from './support/landmarks';
+import { monitorExpectedBrowserFailures } from './support/expected-browser-failures';
 
 type AxePageState = 'login' | 'register' | 'resident-desktop' | 'resident-mobile' | 'super-admin-desktop' | 'super-admin-mobile';
 
@@ -61,16 +62,12 @@ async function scanAxeAndAttach(page: Page, state: AxePageState, scheme: 'light'
 }
 
 test('login renders without browser console or page errors', async ({ page }) => {
-  const consoleErrors: string[] = [];
-  const pageErrors: string[] = [];
-  page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(redactDiagnosticText(message.text())); });
-  page.on('pageerror', (error) => pageErrors.push(redactDiagnosticText(error.message)));
+  const browserFailures = monitorExpectedBrowserFailures(page);
   await page.goto('/login');
   await expect(mainHeading(page, headings.login)).toBeVisible();
   await expect(mainContent(page).locator('input[name="email"]')).toBeVisible();
   await expect(mainContent(page).locator('input[name="password"]')).toBeVisible();
-  expect(consoleErrors, 'Browser console errors').toEqual([]);
-  expect(pageErrors, 'Unhandled page errors').toEqual([]);
+  browserFailures.assertExpectedFailures([]);
 });
 
 test('a resident registers, signs out, and signs back in', async ({ page }) => {
@@ -97,11 +94,13 @@ test('a resident registers, signs out, and signs back in', async ({ page }) => {
 });
 
 test('wrong password shows the generic login error', async ({ page, request }) => {
+  const browserFailures = monitorExpectedBrowserFailures(page);
   const resident = await createResident(request);
   const response = await signIn(page, resident.email, 'WrongPassword123');
   expect(response.status(), 'Wrong-password login response status').toBe(401);
   await expect(mainContent(page).getByText('Invalid email or password', { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
+  browserFailures.assertExpectedFailures([{ method: 'POST', path: '/api/v1/auth/login', status: 401, reason: 'wrong password is deliberately rejected' }]);
 });
 
 test('SUPER_ADMIN signs in and sees the Admins navigation item', async ({ page }) => {

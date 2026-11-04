@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const restoredUser = useQuery({
     queryKey: queryKeys.currentUser,
-    queryFn: () => apiRequest<UserSummary>('/auth/me', { token: storedSession?.token ?? null }),
+    queryFn: ({ signal }) => apiRequest<UserSummary>('/auth/me', { token: storedSession?.token ?? null, signal }),
     enabled: storedSessionValid,
     retry: false,
   });
@@ -100,6 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (credentials: LoginRequest) => {
     const result = await apiRequest<LoginResponse>('/auth/login', { method: 'POST', body: credentials, token: null });
     const next: AuthSession = { token: result.accessToken, expiresAt: result.expiresAt, user: { ...result.user, active: true } };
+    // Publish the token before protected route queries mount after navigation.
+    setTokenProvider(() => next.token);
     writeSession(next); setSession(next); setStatus('authenticated'); setNotice(null);
     queryClient.setQueryData(queryKeys.currentUser, next.user);
     return next.user;

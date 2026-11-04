@@ -9,13 +9,13 @@ function queryString(params: Record<string, string | number | boolean | undefine
 }
 
 export const requestApi = {
-  services: (params: ServiceQuery = {}) => apiRequest<PageResponse<Service>>(`/services${queryString(params as Record<string, string | number | boolean | undefined>)}`),
-  requests: (params: RequestQuery = {}) => apiRequest<PageResponse<ServiceRequest>>(`/requests${queryString(params as Record<string, string | number | boolean | undefined>)}`),
-  request: (id: number) => apiRequest<ServiceRequest>(`/requests/${encodeURIComponent(String(id))}`),
-  history: (id: number) => apiRequest<RequestHistoryEntry[]>(`/requests/${encodeURIComponent(String(id))}/history`),
+  services: (params: ServiceQuery = {}, signal?: AbortSignal) => apiRequest<PageResponse<Service>>(`/services${queryString(params as Record<string, string | number | boolean | undefined>)}`, { signal }),
+  requests: (params: RequestQuery = {}, signal?: AbortSignal) => apiRequest<PageResponse<ServiceRequest>>(`/requests${queryString(params as Record<string, string | number | boolean | undefined>)}`, { signal }),
+  request: (id: number, signal?: AbortSignal) => apiRequest<ServiceRequest>(`/requests/${encodeURIComponent(String(id))}`, { signal }),
+  history: (id: number, signal?: AbortSignal) => apiRequest<RequestHistoryEntry[]>(`/requests/${encodeURIComponent(String(id))}/history`, { signal }),
   createRequest: (body: RequestCreateRequest) => apiRequest<ServiceRequest>('/requests', { method: 'POST', body }),
-  notifications: (params: NotificationQuery = {}) => apiRequest<PageResponse<NotificationItem>>(`/notifications${queryString(params as Record<string, string | number | boolean | undefined>)}`),
-  unreadCount: () => apiRequest<{ count: number }>('/notifications/unread-count'),
+  notifications: (params: NotificationQuery = {}, signal?: AbortSignal) => apiRequest<PageResponse<NotificationItem>>(`/notifications${queryString(params as Record<string, string | number | boolean | undefined>)}`, { signal }),
+  unreadCount: (signal?: AbortSignal) => apiRequest<{ count: number }>('/notifications/unread-count', { signal }),
   markNotificationRead: (id: number) => apiRequest<NotificationReadResponse>(`/notifications/${encodeURIComponent(String(id))}/read`, { method: 'PATCH', body: { read: true } }),
   markAllNotificationsRead: () => apiRequest<void>('/notifications/read-all', { method: 'PATCH' }),
   changePassword: (body: ChangePasswordRequest) => apiRequest<void>('/auth/change-password', { method: 'POST', body }),

@@ -4,29 +4,29 @@ import type { NotificationItem, NotificationQuery, RequestCreateRequest, Request
 import { requestApi } from './api';
 
 export function useServices(params: ServiceQuery = {}) {
-  return useQuery({ queryKey: queryKeys.services.list(params), queryFn: () => requestApi.services(params) });
+  return useQuery({ queryKey: queryKeys.services.list(params), queryFn: ({ signal }) => requestApi.services(params, signal) });
 }
 
 export function useRequests(params: RequestQuery = {}) {
-  return useQuery({ queryKey: queryKeys.requests.list(params), queryFn: () => requestApi.requests(params) });
+  return useQuery({ queryKey: queryKeys.requests.list(params), queryFn: ({ signal }) => requestApi.requests(params, signal) });
 }
 
 export function useRequest(id: number, enabled = true) {
-  return useQuery({ queryKey: queryKeys.requests.detail(id), queryFn: () => requestApi.request(id), enabled });
+  return useQuery({ queryKey: queryKeys.requests.detail(id), queryFn: ({ signal }) => requestApi.request(id, signal), enabled });
 }
 
 export function useRequestHistory(id: number, enabled = true) {
-  return useQuery({ queryKey: queryKeys.requests.history(id), queryFn: () => requestApi.history(id), enabled });
+  return useQuery({ queryKey: queryKeys.requests.history(id), queryFn: ({ signal }) => requestApi.history(id, signal), enabled });
 }
 
 export function useNotifications(params: NotificationQuery = {}) {
-  return useQuery({ queryKey: queryKeys.notifications.list(params), queryFn: () => requestApi.notifications(params) });
+  return useQuery({ queryKey: queryKeys.notifications.list(params), queryFn: ({ signal }) => requestApi.notifications(params, signal) });
 }
 
 export function useUnreadCount(enabled = true) {
   return useQuery({
     queryKey: queryKeys.notifications.unreadCount,
-    queryFn: requestApi.unreadCount,
+    queryFn: ({ signal }) => requestApi.unreadCount(signal),
     enabled,
     refetchInterval: () => document.visibilityState === 'visible' ? 60_000 : false,
     refetchIntervalInBackground: false,

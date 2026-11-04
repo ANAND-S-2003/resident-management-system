@@ -54,6 +54,18 @@ describe('real application router composition', () => {
     expect(router.state.location.pathname).toBe('/resident');
   });
 
+  it('does not retry a not-found detail query', async () => {
+    storeUser('USER');
+    let attempts = 0;
+    server.use(http.get(testApiUrl('/requests/123'), () => {
+      attempts += 1;
+      return HttpResponse.json({ timestamp: expiry(), status: 404, code: 'NOT_FOUND', message: 'missing', path: '/api/v1/requests/123', details: [] }, { status: 404 });
+    }));
+    renderProductionApp('/resident/requests/123');
+    expect(await screen.findByRole('heading', { name: 'Request not found' })).toBeInTheDocument();
+    expect(attempts).toBe(1);
+  });
+
   it('renders the staff shell with Admins for SUPER_ADMIN and without it for ADMIN', async () => {
     storeUser('SUPER_ADMIN');
     const superAdminApp = renderProductionApp('/admin');
@@ -80,7 +92,18 @@ describe('real application router composition', () => {
   });
 
   it('keeps a newly authenticated session instead of clearing the empty startup snapshot', async () => {
-    server.use(http.post(testApiUrl('/auth/login'), () => HttpResponse.json(loginResponse(60 * 60 * 1000))));
+    const authorizationHeaders: string[] = [];
+    server.use(
+      http.post(testApiUrl('/auth/login'), () => HttpResponse.json(loginResponse(60 * 60 * 1000))),
+      http.get(testApiUrl('/requests'), ({ request }) => {
+        authorizationHeaders.push(request.headers.get('Authorization') ?? '');
+        return HttpResponse.json({ content: [], page: 0, size: 1, totalElements: 0, totalPages: 0 });
+      }),
+      http.get(testApiUrl('/notifications/unread-count'), ({ request }) => {
+        authorizationHeaders.push(request.headers.get('Authorization') ?? '');
+        return HttpResponse.json({ count: 0 });
+      }),
+    );
     const user = userEvent.setup();
     renderProductionApp('/login');
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
@@ -89,6 +112,8 @@ describe('real application router composition', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Welcome, Login' })).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
+    await waitFor(() => expect(authorizationHeaders).toHaveLength(7));
+    expect(authorizationHeaders).toEqual(Array(7).fill('Bearer opaque-test-access-token'));
   });
 
   it('accepts the real UTC expiresAt shape and logs out a short-lived session on expiry', async () => {

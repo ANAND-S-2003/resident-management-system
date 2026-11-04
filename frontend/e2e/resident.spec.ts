@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
-import { expect, test, redactDiagnosticText } from './fixtures';
+import { expect, test } from './fixtures';
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test';
 import {
   addDaysToDateOnly,
@@ -15,27 +15,16 @@ import {
 import { signIn, signOut } from './support/auth';
 import { headings, residentDashboardHeading, residentFeatureHeading, type ResidentFeaturePage } from './support/headings';
 import { mainContent, mainHeading, navigationLink } from './support/landmarks';
+import { monitorExpectedBrowserFailures } from './support/expected-browser-failures';
 
 async function waitForHeading(page: Page, name: string) {
   await expect(mainHeading(page, name)).toBeVisible({ timeout: 10_000 });
 }
 
-function monitorBrowserErrors(page: Page): () => void {
-  const consoleErrors: string[] = [];
-  const pageErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(redactDiagnosticText(message.text()));
-  });
-  page.on('pageerror', (error) => pageErrors.push(redactDiagnosticText(error.message)));
-  return () => {
-    expect(consoleErrors, 'Browser console errors').toEqual([]);
-    expect(pageErrors, 'Unhandled page errors').toEqual([]);
-  };
-}
-
 test('resident request lifecycle, notifications, ownership, and password change work end to end', async ({ page, request }) => {
   test.setTimeout(90_000);
-  const assertNoBrowserErrors = monitorBrowserErrors(page);
+  const browserFailures = monitorExpectedBrowserFailures(page);
+  const expectedFailures: Array<{ method: string; path: string; status: number; reason: string }> = [];
   const resident = residentCredentials();
   const authForm = mainContent(page);
   await page.goto('/register');
@@ -124,6 +113,8 @@ test('resident request lifecycle, notifications, ownership, and password change 
   await page.goto(requestPath);
   await waitForHeading(page, headings.requestNotFound);
   await expect(mainContent(page).getByRole('link', { name: 'Back to my requests', exact: true })).toBeVisible();
+  expectedFailures.push({ method: 'GET', path: `/api/v1/requests/${encodeURIComponent(String(requestId))}`, status: 404, reason: 'a different resident cannot read this request' });
+  browserFailures.assertExpectedFailures(expectedFailures);
 
   const firstLoginResponse = await signIn(page, resident.email, resident.password);
   expect(firstLoginResponse.status(), 'Original resident login response status').toBe(200);
@@ -145,12 +136,14 @@ test('resident request lifecycle, notifications, ownership, and password change 
   expect(oldPasswordResponse.status(), 'Old-password login response status').toBe(401);
   await expect(page).toHaveURL(/\/login$/);
   await expect(mainContent(page).getByText('Invalid email or password', { exact: true })).toBeVisible();
+  expectedFailures.push({ method: 'POST', path: '/api/v1/auth/login', status: 401, reason: 'old password was deliberately rejected after the password change' });
+  browserFailures.assertExpectedFailures(expectedFailures);
 
   const finalLoginResponse = await signIn(page, resident.email, newPassword);
   expect(finalLoginResponse.status(), 'Login with changed password response status').toBe(200);
   await expect(page).toHaveURL(/\/resident$/, { timeout: 10_000 });
   await waitForHeading(page, residentDashboardHeading(resident.fullName));
-  assertNoBrowserErrors();
+  browserFailures.assertExpectedFailures(expectedFailures);
 });
 
 type ScanState = ResidentFeaturePage;

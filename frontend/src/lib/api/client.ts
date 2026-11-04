@@ -37,7 +37,8 @@ export async function apiRequest<T>(path: string, options: { method?: string; bo
   let response: Response;
   try {
     response = await fetch(new URL(`${apiBase}${path}`, window.location.origin).toString(), init);
-  } catch {
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
     throw new ApiError(0, 'NETWORK_ERROR', 'Unable to connect. Check your connection and try again.');
   }
   const raw = await response.text();

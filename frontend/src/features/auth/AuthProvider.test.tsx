@@ -7,20 +7,23 @@ import { server } from '@/test/server';
 import { testApiUrl } from '@/test/api-url';
 import { readSession, writeSession } from './session';
 import { AuthProvider, useAuth } from './AuthProvider';
+import { useRequests } from '@/features/requests/hooks';
 
 const userDto = { id: 9, fullName: 'Session User', email: 'session@example.test', role: 'USER' as const, flatNumber: 'A-9', active: true };
 const futureExpiry = () => new Date(Date.now() + 30 * 60 * 1000).toISOString();
 const session = { token: 'provider-test-token', expiresAt: futureExpiry(), user: userDto };
 
-function Probe() {
+function Probe({ watchRequests = false }: { watchRequests?: boolean }) {
   const auth = useAuth();
   const queryClient = useQueryClient();
-  return <div><span>{auth.status}</span><span>{auth.user?.fullName}</span><button onClick={() => auth.logout()}>Log out</button><button onClick={() => queryClient.setQueryData<string>(['private'], 'cached')}>Seed cache</button></div>;
+  return <div><span>{auth.status}</span><span>{auth.user?.fullName}</span>{watchRequests && auth.status === 'authenticated' && <RequestsProbe />}<button onClick={() => auth.logout()}>Log out</button><button onClick={() => queryClient.setQueryData<string>(['private'], 'cached')}>Seed cache</button></div>;
 }
 
-function renderProvider() {
+function RequestsProbe() { const requests = useRequests(); return <span>Requests {requests.fetchStatus}</span>; }
+
+function renderProvider(watchRequests = false) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return { queryClient, ...render(<QueryClientProvider client={queryClient}><MemoryRouter><AuthProvider><Probe /></AuthProvider></MemoryRouter></QueryClientProvider>) };
+  return { queryClient, ...render(<QueryClientProvider client={queryClient}><MemoryRouter><AuthProvider><Probe watchRequests={watchRequests} /></AuthProvider></MemoryRouter></QueryClientProvider>) };
 }
 
 describe('AuthProvider session lifecycle', () => {
@@ -55,6 +58,26 @@ describe('AuthProvider session lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
     expect(await screen.findByText('anonymous')).toBeInTheDocument();
     expect(readSession()).toBeNull();
+    expect(queryClient.getQueryData(['private'])).toBeUndefined();
+  });
+
+  it('aborts in-flight protected requests when logging out', async () => {
+    writeSession(session);
+    let requestSignal: AbortSignal | undefined;
+    server.use(
+      http.get(testApiUrl('/auth/me'), () => HttpResponse.json(userDto)),
+      http.get(testApiUrl('/requests'), ({ request }) => new Promise<Response>((resolve) => {
+        requestSignal = request.signal;
+        request.signal.addEventListener('abort', () => resolve(HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })), { once: true });
+      })),
+    );
+    const { queryClient } = renderProvider(true);
+    expect(await screen.findByText('authenticated')).toBeInTheDocument();
+    await screen.findByText('Requests fetching');
+    expect(requestSignal?.aborted).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    expect(await screen.findByText('anonymous')).toBeInTheDocument();
+    expect(requestSignal?.aborted).toBe(true);
     expect(queryClient.getQueryData(['private'])).toBeUndefined();
   });
 });
