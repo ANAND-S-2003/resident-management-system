@@ -111,12 +111,40 @@ export function Dialog({ open, title, onClose, children }: { open: boolean; titl
 /** Confirmation modal that keeps the same keyboard and focus guarantees as Dialog. */
 export function ConfirmDialog(props: { open: boolean; title: string; onClose: () => void; onConfirm: () => void; children: ReactNode }) { return <Dialog open={props.open} title={props.title} onClose={props.onClose}><div>{props.children}</div><div className="dialog-actions"><Button variant="secondary" onClick={props.onClose}>Cancel</Button><Button variant="danger" onClick={props.onConfirm}>Confirm</Button></div></Dialog>; }
 
-interface ToastItem { id: number; message: string }
-/** Polite, dismissible transient announcements. */
-export function ToastProvider({ children }: { children: ReactNode }) { const [items, setItems] = useState<ToastItem[]>([]); const nextId = useRef(0); const dismiss = useCallback((id: number) => setItems((current) => current.filter((item) => item.id !== id)), []);
-  useEffect(() => { if (!items.length) return; const timers = items.map((item) => window.setTimeout(() => dismiss(item.id), 5000)); return () => timers.forEach(window.clearTimeout); }, [items, dismiss]);
-  const toast = (message: string) => setItems((current) => [...current, { id: ++nextId.current, message }]);
-  return <ToastContext.Provider value={toast}>{children}<div className="toast-region" aria-live="polite" aria-relevant="additions text">{items.map((item) => <div className="toast" key={item.id}>{item.message}<button aria-label="Dismiss notification" onClick={() => dismiss(item.id)}><span aria-hidden="true">×</span></button></div>)}</div></ToastContext.Provider>;
+type ToastTone = 'success' | 'error';
+interface ToastItem { id: number; message: string; tone: ToastTone; duration: number }
+/** Persistent polite live region with dismissible messages that pause while hovered or focused. */
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<ToastItem[]>([]);
+  const nextId = useRef(0);
+  const dismiss = useCallback((id: number) => setItems((current) => current.filter((item) => item.id !== id)), []);
+  const toast = useCallback((message: string, tone: ToastTone = 'success') => {
+    const duration = tone === 'success' && message.length > 60 ? 10_000 : 6_000;
+    setItems((current) => [...current, { id: ++nextId.current, message, tone, duration }]);
+  }, []);
+  return <ToastContext.Provider value={toast}>{children}<div className="toast-region" data-testid="toast-region" aria-live="polite" aria-relevant="additions text">{items.map((item) => <ToastMessage key={item.id} item={item} onDismiss={() => dismiss(item.id)} />)}</div></ToastContext.Provider>;
 }
-const ToastContext = createContext<((message: string) => void) | null>(null);
+
+function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const remaining = useRef(item.duration);
+  const paused = hovered || focused;
+  useEffect(() => {
+    if (paused) return;
+    const startedAt = Date.now();
+    const timer = window.setTimeout(onDismiss, remaining.current);
+    return () => {
+      window.clearTimeout(timer);
+      remaining.current = Math.max(0, remaining.current - (Date.now() - startedAt));
+    };
+  }, [onDismiss, paused]);
+  return <div className="toast" role={item.tone === 'error' ? 'alert' : 'status'} aria-live={item.tone === 'error' ? 'assertive' : 'polite'} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => {
+    const next = event.relatedTarget;
+    if (!(next instanceof Node) || !event.currentTarget.contains(next)) setFocused(false);
+  }}>
+    {item.message}<button aria-label="Dismiss notification" onClick={onDismiss}><span aria-hidden="true">×</span></button>
+  </div>;
+}
+const ToastContext = createContext<((message: string, tone?: ToastTone) => void) | null>(null);
 export function useToast() { const toast = useContext(ToastContext); if (!toast) throw new Error('useToast must be used inside ToastProvider'); return toast; }

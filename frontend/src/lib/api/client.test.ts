@@ -44,4 +44,14 @@ describe('typed API client', () => {
     server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.error()));
     await expect(apiRequest('/auth/me')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
   });
+  it('resolves empty 204 responses without attempting JSON parsing', async () => {
+    server.use(
+      http.post(testApiUrl('/auth/change-password'), () => new HttpResponse(null, { status: 204 })),
+      http.patch(testApiUrl('/notifications/9/read'), () => new HttpResponse(null, { status: 204 })),
+      http.patch(testApiUrl('/notifications/read-all'), () => new HttpResponse(null, { status: 204 })),
+    );
+    await expect(apiRequest<void>('/auth/change-password', { method: 'POST', body: { currentPassword: 'old', newPassword: 'new' } })).resolves.toBeUndefined();
+    await expect(apiRequest<void>('/notifications/9/read', { method: 'PATCH', body: { read: true } })).resolves.toBeUndefined();
+    await expect(apiRequest<void>('/notifications/read-all', { method: 'PATCH' })).resolves.toBeUndefined();
+  });
 });

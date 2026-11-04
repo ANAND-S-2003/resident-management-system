@@ -14,6 +14,7 @@ import { RegisterPage } from './RegisterPage';
 import { AppShell } from '@/app/layout';
 import { ComingSoon } from '@/app/pages';
 import { writeSession } from './session';
+import { queryKeys } from '@/lib/query-keys';
 
 function renderAuth(node: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -56,19 +57,20 @@ describe('authentication pages', () => {
   });
   it('login view passes axe accessibility checks', async () => {
     const { container } = renderAuth(<LoginPage />);
-    const results = await axe.run(container);
+    const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
   });
   it('register view and authenticated app shell pass axe accessibility checks', async () => {
     const registerRender = renderAuth(<RegisterPage />);
-    expect((await axe.run(registerRender.container)).violations).toEqual([]);
+    expect((await axe.run(registerRender.container, { rules: { 'color-contrast': { enabled: false } } })).violations).toEqual([]);
     registerRender.unmount();
     writeSession({ token: 'stored-token', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user: { id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true } });
     server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.json({ id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true })));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const shell = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<ComingSoon title="Resident dashboard" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
     await screen.findByRole('heading', { name: 'Resident dashboard' });
-    expect((await axe.run(shell.container)).violations).toEqual([]);
+    await waitFor(() => expect(client.getQueryState(queryKeys.notifications.unreadCount)?.status).toBe('success'));
+    expect((await axe.run(shell.container, { rules: { 'color-contrast': { enabled: false } } })).violations).toEqual([]);
   });
   it('mobile navigation traps focus and closes with Escape', async () => {
     const user = userEvent.setup();

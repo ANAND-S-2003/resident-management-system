@@ -17,7 +17,7 @@ export function NotificationsPage() {
   const unreadTotal = unread.data?.count ?? 0;
   const markAllRead = async () => {
     try { await markAll.mutateAsync(); toast('All notifications marked as read.'); }
-    catch (error) { toast(friendlyErrorMessage(error)); }
+    catch (error) { toast(friendlyErrorMessage(error), 'error'); }
   };
   if (query.isLoading) return <><PageHeader title="Notifications" /><Skeleton className="list-skeleton" /><Skeleton className="list-skeleton" /></>;
   if (query.isError) return <><PageHeader title="Notifications" /><ErrorState error={query.error} onRetry={() => void query.refetch()} /></>;
@@ -29,7 +29,7 @@ export function NotificationsPage() {
       <ul className="notification-list">{content.map((item) => <li key={item.id}><Card className={`notification-card${item.read ? '' : ' notification-unread'}`}>
         <div className="notification-heading"><div>{!item.read && <><span className="unread-dot" aria-hidden="true" /><span className="sr-only">Unread: </span><span className="badge badge-info">New</span></>}</div><time dateTime={item.createdAt}>{formatTimestamp(item.createdAt)}</time></div>
         <p>{item.message}</p>
-        <div className="notification-actions"><Link to={`/resident/requests/${encodeURIComponent(String(item.requestId))}`}>View request</Link>{!item.read && <Button variant="secondary" size="sm" disabled={markRead.isPending} onClick={() => markRead.mutate(item.id, { onError: (error) => toast(friendlyErrorMessage(error)) })}>Mark as read</Button>}</div>
+        <div className="notification-actions"><Link to={`/resident/requests/${encodeURIComponent(String(item.requestId))}`}>View request</Link>{!item.read && <Button variant="secondary" size="sm" disabled={markRead.isPending} onClick={() => markRead.mutate(item.id, { onError: (error) => toast(friendlyErrorMessage(error), 'error') })}>Mark as read</Button>}</div>
       </Card></li>)}</ul>
       <Pagination page={page} size={query.data?.size ?? size} totalElements={query.data?.totalElements ?? 0} onPageChange={setPage} onSizeChange={(value) => { setSize(value); setPage(0); }} />
     </>}

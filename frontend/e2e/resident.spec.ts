@@ -135,9 +135,10 @@ test('resident request lifecycle, notifications, ownership, and password change 
   await account.locator('input[name="newPassword"]').fill(newPassword);
   await account.locator('input[name="confirmPassword"]').fill(newPassword);
   const changeResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/auth/change-password'));
+  const successToast = expect(page.getByTestId('toast-region').getByRole('status').filter({ hasText: 'Password changed' })).toBeVisible({ timeout: 10_000 });
   await account.getByRole('button', { name: 'Change password', exact: true }).click();
   expect((await changeResponse).status(), 'Change password response status').toBe(204);
-  await expect(page.locator('.toast-region').getByText('Password changed successfully. You are still signed in.', { exact: true })).toBeVisible();
+  await successToast;
   await signOut(page);
 
   const oldPasswordResponse = await signIn(page, resident.email, resident.password);

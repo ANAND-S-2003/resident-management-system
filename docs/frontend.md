@@ -51,7 +51,7 @@ If session validation fails for a network or server error other than 401, the ap
 
 ## API and error handling
 
-The typed `fetch` wrapper sends JSON only when a body exists, accepts an `AbortSignal`, adds a bearer token from the current session, and parses the documented error envelope. `ApiError` carries the HTTP status, API code, safe message, field errors, and `Retry-After` seconds. Network and non-JSON responses map to `NETWORK_ERROR` and `UNKNOWN` without exposing raw response bodies. `INVALID_CREDENTIALS` stays on the login form; `UNAUTHENTICATED` on an authenticated request expires the session; `FORBIDDEN` remains a permission error; rate limits show the documented wait duration.
+The typed `fetch` wrapper sends JSON only when a body exists, accepts an `AbortSignal`, adds a bearer token from the current session, and parses the documented error envelope. Empty `204 No Content` responses resolve to `undefined` without JSON parsing. `ApiError` carries the HTTP status, API code, safe message, field errors, and `Retry-After` seconds. Network and non-JSON responses map to `NETWORK_ERROR` and `UNKNOWN` without exposing raw response bodies. `INVALID_CREDENTIALS` stays on the login form; `UNAUTHENTICATED` on an authenticated request expires the session; `FORBIDDEN` remains a permission error; rate limits show the documented wait duration.
 
 DTO shapes, enum spellings, validation limits and error codes follow the authoritative contract in [api.md](api.md) and [requirements.md](requirements.md). The UI uses text rendering only for user-supplied data.
 
@@ -63,7 +63,7 @@ The request list keeps status, overdue, page, size, and sort in the URL. Invalid
 
 API request dates are date-only `YYYY-MM-DD` values in the community time zone. `src/config/time.ts` defines `APP_TIME_ZONE = "Asia/Kolkata"` and must match backend `RMS_TIMEZONE`. Date-only parsing and display never pass those strings through JavaScript's UTC date-string parser. The minimum date for a new request is computed with `Intl.DateTimeFormat.formatToParts` in that configured time zone. ISO UTC timestamps are parsed as instants and displayed with the browser's locale and time zone.
 
-Unread notification counts refresh every 60 seconds while the document is visible, do not poll in the background, and refresh when the window regains focus. The mark-all action shows a success toast after completion; no extra confirmation dialog is used.
+Unread notification counts refresh every 60 seconds while the document is visible, do not poll in the background, and refresh when the window regains focus. The mark-all action shows a success toast after completion; no extra confirmation dialog is used. Toast announcements live in one persistent polite region. Success messages use `role="status"`, errors use `role="alert"`; they remain for at least six seconds (long success messages remain ten seconds) and their timers pause while hovered or keyboard-focused. Toasts remain manually dismissible.
 
 Shared status badges and request error presentation are in one module/component path. The overdue badge uses only the API's `overdue` field; the browser never recomputes overdue status. `ErrorState` exposes a friendly message and Retry action, while API codes and raw response bodies are kept out of resident-facing text.
 
@@ -138,7 +138,7 @@ npm run test -- --run
 npm run build
 ```
 
-Vitest uses jsdom, React Testing Library, jest-dom, user-event and MSW v2. Keep tests isolated from real services; add API behavior to MSW handlers. Accessibility checks use axe-core. Use TanStack Query for server data and shared query keys in `src/lib/query-keys.ts`; do not fetch server data from `useEffect`.
+Vitest uses jsdom, React Testing Library, jest-dom, user-event and MSW v2. Keep tests isolated from real services; add API behavior to MSW handlers. jsdom does not implement canvas, so unit axe scans disable only the `color-contrast` rule; the Playwright browser axe scans retain color-contrast in light and dark schemes using a real browser. Use TanStack Query for server data and shared query keys in `src/lib/query-keys.ts`; do not fetch server data from `useEffect`.
 
 ## Browser end-to-end tests (Windows PowerShell)
 
