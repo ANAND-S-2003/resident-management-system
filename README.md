@@ -68,7 +68,7 @@ npm run dev
 
 Vite prints the development URL. To verify the frontend, run `npm run typecheck`, `npm run lint`, `npm run test -- --run`, and `npm run build` from `frontend/`. See [frontend architecture and routes](docs/frontend.md).
 
-The resident area includes the dashboard, request creation/list/detail and status history, notifications, and account settings. Staff feature screens remain placeholders. Run unit tests and the real-backend browser suite from `frontend/`:
+The resident area includes the dashboard, request creation/list/detail and status history, notifications, and account settings. Staff now have a request dashboard, request list, detail/history view, and status/remarks management. Staff resident, service, message, and admin management screens remain placeholders. Run unit tests and the real-backend browser suite from `frontend/`:
 
 ```powershell
 npm run test -- "--run"
@@ -76,7 +76,7 @@ npm run e2e:install
 npm run e2e
 ```
 
-The E2E suite requires the database and backend to be running as described above, plus `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD` loaded in that PowerShell session.
+The E2E suite requires the database and backend to be running as described above, plus `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD` loaded in that PowerShell session. Staff workflow tests create ADMIN accounts through the super admin API, create uniquely named requests, exercise transitions and conflicts, and include mobile and axe scans. Test data is not deleted.
 
 Playwright creates uniquely named residents. Read-only resident scenarios reuse one API-registered account per worker; UI registration remains covered by the registration flows. To repeat the suite without the documented registration/login limits interrupting local runs, start the backend in a separate repository-root PowerShell window with `.scripts\start-backend-for-e2e.ps1`. It loads `.env`, starts the database and sets `RMS_RATE_LIMIT_REGISTER_MAX` and `RMS_RATE_LIMIT_LOGIN_MAX` to `1000` for that backend process only. This override is for local E2E runs only, never production. Restarting the backend also resets the in-memory counters; no rate-limit defaults are changed.
 

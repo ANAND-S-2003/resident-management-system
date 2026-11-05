@@ -19,7 +19,10 @@ const NewRequest = lazy(() => import('@/features/requests/RequestFormPage').then
 const RequestDetails = lazy(() => import('@/features/requests/RequestDetailPage').then((module) => ({ default: module.RequestDetailPage })));
 const ResidentNotifications = lazy(() => import('@/features/notifications/NotificationsPage').then((module) => ({ default: module.NotificationsPage })));
 const Account = lazy(() => import('@/features/account/AccountPage').then((module) => ({ default: module.AccountPage })));
-const AdminHome = lazyPage('Admin dashboard'); const AdminRequests = lazyPage('Requests'); const AdminRequestDetails = lazyPage('Request details'); const Residents = lazyPage('Residents'); const Services = lazyPage('Services'); const Messages = lazyPage('Messages'); const Admins = lazyPage('Admins'); const Contact = lazyPage('Contact');
+const AdminHome = lazy(() => import('@/features/dashboard/StaffDashboard').then((module) => ({ default: module.StaffDashboard })));
+const AdminRequests = lazy(() => import('@/features/requests/StaffRequestListPage').then((module) => ({ default: module.StaffRequestListPage })));
+const AdminRequestDetails = lazy(() => import('@/features/requests/StaffRequestDetailPage').then((module) => ({ default: module.StaffRequestDetailPage })));
+const Residents = lazyPage('Residents'); const Services = lazyPage('Services'); const Messages = lazyPage('Messages'); const Admins = lazyPage('Admins'); const Contact = lazyPage('Contact');
 const fallback = <div className="route-loading" role="status"><Spinner />Loading page...</div>;
 
 export const appRoutes: RouteObject[] = [{

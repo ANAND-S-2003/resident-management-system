@@ -20,7 +20,10 @@ function renderProductionApp(path: string) {
 function storeUser(role: TestRole) {
   const user = { id: 80, fullName: `Test ${role}`, email: `${role.toLowerCase()}@example.test`, role, flatNumber: role === 'USER' ? 'U-80' : null, active: true };
   writeSession({ token: `token-${role}`, expiresAt: expiry(), user });
-  server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.json(user)));
+  server.use(
+    http.get(testApiUrl('/auth/me'), () => HttpResponse.json(user)),
+    http.get(testApiUrl('/dashboard/summary'), () => HttpResponse.json({ byStatus: { PENDING: 0, IN_PROGRESS: 0, COMPLETED: 0, REJECTED: 0 }, overdueCount: 0, totalRequests: 0, activeResidents: 0, ...(role === 'SUPER_ADMIN' ? { activeAdmins: 0 } : {}) })),
+  );
 }
 
 function loginResponse(expiresInMs: number) {

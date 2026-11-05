@@ -15,12 +15,21 @@ export const queryKeys = {
     histories: () => ['requests', 'history'] as const,
     history: (id: number, params?: unknown) => ['requests', 'history', id, params] as const,
   },
+  staffRequests: {
+    lists: () => ['requests', 'staff-list'] as const,
+    list: (params: unknown) => ['requests', 'staff-list', params] as const,
+    detail: (id: number) => ['requests', 'staff-detail', id] as const,
+    history: (id: number) => ['requests', 'staff-history', id] as const,
+  },
   notifications: {
     all: ['notifications'] as const,
     lists: () => ['notifications', 'list'] as const,
     list: (params: unknown) => ['notifications', 'list', params] as const,
     unreadCount: ['notifications', 'unread-count'] as const,
   },
-  dashboard: ['dashboard'] as const,
+  dashboard: {
+    all: ['dashboard'] as const,
+    summary: ['dashboard', 'summary'] as const,
+  },
   contactQueries: ['contact-queries'] as const,
 };

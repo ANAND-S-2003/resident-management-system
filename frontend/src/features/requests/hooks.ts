@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
-import type { NotificationItem, NotificationQuery, RequestCreateRequest, RequestQuery, ServiceQuery, ChangePasswordRequest } from '@/lib/api/types';
+import type { NotificationItem, NotificationQuery, RequestCreateRequest, RequestQuery, ServiceQuery, ChangePasswordRequest, UpdateServiceRequestBody } from '@/lib/api/types';
 import { requestApi } from './api';
 
 export function useServices(params: ServiceQuery = {}) {
@@ -17,6 +17,41 @@ export function useRequest(id: number, enabled = true) {
 
 export function useRequestHistory(id: number, enabled = true) {
   return useQuery({ queryKey: queryKeys.requests.history(id), queryFn: ({ signal }) => requestApi.history(id, signal), enabled });
+}
+
+export function useDashboardSummary() {
+  return useQuery({ queryKey: queryKeys.dashboard.summary, queryFn: ({ signal }) => requestApi.dashboardSummary(signal), refetchOnWindowFocus: true });
+}
+
+export function useStaffRequests(params: RequestQuery = {}) {
+  return useQuery({ queryKey: queryKeys.staffRequests.list(params), queryFn: ({ signal }) => requestApi.requests(params, signal), refetchOnWindowFocus: true });
+}
+
+export function useStaffRequest(id: number, enabled = true) {
+  return useQuery({ queryKey: queryKeys.staffRequests.detail(id), queryFn: ({ signal }) => requestApi.request(id, signal), enabled, refetchOnWindowFocus: true });
+}
+
+export function useStaffRequestHistory(id: number, enabled = true) {
+  return useQuery({ queryKey: queryKeys.staffRequests.history(id), queryFn: ({ signal }) => requestApi.history(id, signal), enabled, refetchOnWindowFocus: true });
+}
+
+export function useUpdateStaffRequest(id: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateServiceRequestBody) => requestApi.updateRequest(id, body),
+    onSuccess: async (_data, body) => {
+      const invalidations = [client.invalidateQueries({ queryKey: queryKeys.staffRequests.detail(id) })];
+      if (body.status !== undefined) invalidations.push(
+        client.invalidateQueries({ queryKey: queryKeys.staffRequests.history(id) }),
+        client.invalidateQueries({ queryKey: queryKeys.staffRequests.lists() }),
+        client.invalidateQueries({ queryKey: queryKeys.requests.lists() }),
+        client.invalidateQueries({ queryKey: queryKeys.requests.detail(id) }),
+        client.invalidateQueries({ queryKey: queryKeys.requests.history(id) }),
+        client.invalidateQueries({ queryKey: queryKeys.dashboard.summary }),
+      );
+      await Promise.all(invalidations);
+    },
+  });
 }
 
 export function useNotifications(params: NotificationQuery = {}) {
@@ -37,7 +72,7 @@ export function useUnreadCount(enabled = true) {
 export function useCreateRequest() {
   const client = useQueryClient();
   return useMutation({ mutationFn: (body: RequestCreateRequest) => requestApi.createRequest(body), onSuccess: async () => {
-    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.requests.lists() }), client.invalidateQueries({ queryKey: queryKeys.dashboard })]);
+    await Promise.all([client.invalidateQueries({ queryKey: queryKeys.requests.lists() }), client.invalidateQueries({ queryKey: queryKeys.dashboard.all })]);
   } });
 }
 

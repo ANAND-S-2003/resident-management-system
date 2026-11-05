@@ -11,8 +11,8 @@ frontend/
     components/ui/       Typed accessible design primitives
     config/              Branding and application time zone
     features/auth/       Session provider, login/register, schemas' consumers
-    features/dashboard/  Resident dashboard and request-count summaries
-    features/requests/   Request APIs, query hooks, forms, lists, detail and status presentation
+    features/dashboard/  Resident and staff dashboards with summary counts
+    features/requests/   Request APIs, query hooks, forms, resident/staff lists, details and status presentation
     features/notifications/ Resident notification list and read actions
     features/account/    Profile and change-password page
     lib/api/             Fetch client, session token bridge, DTO types
@@ -21,7 +21,7 @@ frontend/
     test/                Vitest setup and MSW handlers
 ```
 
-Resident dashboard, request creation/list/detail/history, notifications, and account screens are implemented. Staff request, resident, service, message, and admin screens remain placeholders for later steps. The public contact page also remains a placeholder.
+Resident dashboard, request creation/list/detail/history, notifications, account screens, the staff dashboard, and staff request list/detail management are implemented. Staff resident, service, message, and admin screens remain placeholders for later steps. The public contact page also remains a placeholder.
 
 ## Route map
 
@@ -34,7 +34,10 @@ Resident dashboard, request creation/list/detail/history, notifications, and acc
 | `/resident/requests/new` | USER | New service request |
 | `/resident/requests/:id` | USER | Request details and status history |
 | `/resident/notifications` | USER | Notifications, unread filter and read actions |
-| `/admin`, `/admin/requests`, `/admin/requests/:id`, `/admin/residents`, `/admin/services`, `/admin/messages` | ADMIN or SUPER_ADMIN | Coming soon |
+| `/admin` | ADMIN or SUPER_ADMIN | Dashboard summary and attention lists |
+| `/admin/requests` | ADMIN or SUPER_ADMIN | All requests with URL-backed filters, search, sort, and pagination |
+| `/admin/requests/:id` | ADMIN or SUPER_ADMIN | Request details, history, and status/remarks management |
+| `/admin/residents`, `/admin/services`, `/admin/messages` | ADMIN or SUPER_ADMIN | Coming soon |
 | `/admin/admins` | SUPER_ADMIN | Coming soon |
 | `/account` | Any authenticated role | Profile and change password |
 | `/forbidden` | Public error page | Access denied |
@@ -66,6 +69,18 @@ API request dates are date-only `YYYY-MM-DD` values in the community time zone. 
 Unread notification counts refresh every 60 seconds while the document is visible, do not poll in the background, and refresh when the window regains focus. The mark-all action shows a success toast after completion; no extra confirmation dialog is used. Toast announcements live in one persistent polite region. Success messages use `role="status"`, errors use `role="alert"`; they remain for at least six seconds (long success messages remain ten seconds) and their timers pause while hovered or keyboard-focused. Toasts remain manually dismissible.
 
 Shared status badges and request error presentation are in one module/component path. The overdue badge uses only the API's `overdue` field; the browser never recomputes overdue status. `ErrorState` exposes a friendly message and Retry action, while API codes and raw response bodies are kept out of resident-facing text.
+
+## Staff request data and workflow
+
+The staff dashboard calls `GET /dashboard/summary` for the four status totals, overdue count, total requests and active residents. It renders `activeAdmins` only when the current role is `SUPER_ADMIN` and the response contains that property. The pending attention list uses `createdAt,asc`; the most overdue list uses `expectedCompletionDate,asc`, the earliest expected date first. Summary, attention, request list, detail and history queries refresh when the window regains focus.
+
+Staff query keys use the shared factory in `src/lib/query-keys.ts`: `dashboard.summary`, `staffRequests.list(params)`, `staffRequests.detail(id)`, and `staffRequests.history(id)`. A successful status or remarks update invalidates that request's detail and history, every staff and resident request list, and the dashboard summary. Queries pass their abort signal to the API client.
+
+`src/features/requests/request-actions.ts` is the pure UI map for allowed next actions: PENDING offers Start work and Reject; IN_PROGRESS offers Mark completed and Reject; COMPLETED and REJECTED offer none. The backend remains authoritative. REJECTED requires remarks. Completing and rejecting use a confirmation dialog; Start work submits directly with optional remarks. A remarks-only edit is available while open and explains that it creates no history entry and no resident notification.
+
+The staff list stores status, overdue, q, page, size and sort in the URL query string. Unknown status, sort, page and size values fall back or clamp to safe values; q is trimmed and capped at 100 Unicode code points, then applied after an approximately 400 ms debounce. The staff sort whitelist is `createdAt`, `requestDate`, `expectedCompletionDate` and `status`, in either direction, with `createdAt,desc` as the default. Status and overdue filters are sent together when both are selected; q is sent to the backend only in the staff view.
+
+Invalid or non-positive request IDs are treated as not found without an API call. Detail and history data are rendered from the documented request DTO and plain-array history response. A 409 `INVALID_STATUS_TRANSITION` or `CONCURRENT_MODIFICATION` tells staff that another update may have landed, then reloads the request and history. Validation field details map to the remarks control; forbidden, missing, rate-limit and network failures use friendly messages without exposing server text or error codes.
 
 ## Design tokens and components
 
@@ -155,3 +170,5 @@ npm run e2e
 The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. Axe checks use one test per page state and color scheme (login, register, resident shell, resident mobile drawer, SUPER_ADMIN shell, SUPER_ADMIN mobile drawer), each with a 90-second timeout. Each scan attaches its full axe JSON result; failures list every serious or critical rule, impact, selector, and node summary. The suite requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.
 
 The read-only shell and axe scenarios reuse one resident registered through the API per Playwright worker. UI registration remains tested by the registration flow and resident lifecycle tests. Registration is normally limited to 10 attempts per rolling hour per client IP, and failed logins to 5 per rolling 15 minutes per IP/email. For repeated local E2E runs, start the backend in a separate PowerShell window from the repository root with `.scripts\start-backend-for-e2e.ps1`; it loads `.env`, starts MySQL, and raises only the local backend process's registration and login limits to 1000. These overrides are for local E2E runs only and must never be used in production. Restarting the backend resets its in-memory counters.
+
+Staff browser tests create an ADMIN through the configured SUPER_ADMIN, seed uniquely searchable requests through the API, and exercise both status transitions and concurrency conflict refresh. Axe scans cover the staff dashboard, request list, request detail, and an open status dialog in light and dark schemes. Staff resident, service, message and admin-management placeholders are not covered as feature pages yet.

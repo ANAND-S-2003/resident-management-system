@@ -2,6 +2,7 @@ export const headings = {
   login: 'Sign in',
   register: 'Create your resident account',
   staffDashboard: 'Admin dashboard',
+  staffRequests: 'Requests',
   forbidden: 'Access denied',
   requests: 'My requests',
   newRequest: 'New request',
@@ -16,6 +17,10 @@ export function residentDashboardHeading(fullName: string): string {
 
 export function requestDetailHeading(requestId: number, serviceName: string): string {
   return `Request #${requestId}: ${serviceName}`;
+}
+
+export function staffRequestDetailHeading(requestId: number, serviceName: string): string {
+  return requestDetailHeading(requestId, serviceName);
 }
 
 export type AxePageState = 'login' | 'register' | 'resident-desktop' | 'resident-mobile' | 'super-admin-desktop' | 'super-admin-mobile';

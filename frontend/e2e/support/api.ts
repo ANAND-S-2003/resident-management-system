@@ -11,6 +11,8 @@ export interface TestResident {
   password: string;
 }
 
+export interface TestAdmin { fullName: string; email: string; password: string }
+
 export interface BrowserAuthSession {
   token: string;
   expiresAt: string;
@@ -41,6 +43,8 @@ export interface ResidentScenario {
 
 let superAdminSessionPromise: Promise<BrowserAuthSession> | null = null;
 let readOnlyResidentPromise: Promise<TestResident> | null = null;
+let readOnlyResidentSessionPromise: Promise<BrowserAuthSession> | null = null;
+let readOnlyStaffPromise: Promise<{ admin: TestAdmin; session: BrowserAuthSession }> | null = null;
 
 export function assertNotRateLimited(status: number, action: string): void {
   if (status === 429) {
@@ -56,6 +60,11 @@ export function residentCredentials(): TestResident {
     flatNumber: `F-${suffix.slice(0, 6)}`,
     password: `Resident-${suffix}-7a`,
   };
+}
+
+export function adminCredentials(): TestAdmin {
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
+  return { fullName: `E2E Admin ${suffix}`, email: `e2e-admin-${suffix}@example.test`, password: `Admin-${suffix}-7b` };
 }
 
 export function addDaysToDateOnly(dateOnly: string, days: number): string {
@@ -118,7 +127,8 @@ export async function installSession(page: Page, session: BrowserAuthSession): P
 
 export async function createResidentScenario(request: APIRequestContext, withRequest: boolean): Promise<ResidentScenario> {
   const resident = await createReadOnlyResident(request);
-  const session = await loginWithApi(request, resident.email, resident.password);
+  if (!readOnlyResidentSessionPromise) readOnlyResidentSessionPromise = loginWithApi(request, resident.email, resident.password);
+  const session = await readOnlyResidentSessionPromise;
   if (!withRequest) return { resident, session, requestId: null, serviceName: null };
 
   const serviceResponse = await request.get(`${backendApi}/services?page=0&size=100&sort=name%2Casc`, {
@@ -141,7 +151,7 @@ export async function createResidentScenario(request: APIRequestContext, withReq
   return { resident, session, requestId: requestBody.id, serviceName: requestBody.service.name };
 }
 
-function applicationToday(): string {
+export function applicationToday(): string {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
@@ -149,4 +159,26 @@ function applicationToday(): string {
     day: '2-digit',
   }).formatToParts(new Date()).map((part) => [part.type, part.value]));
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export async function createAdminAccount(request: APIRequestContext, admin = adminCredentials()): Promise<TestAdmin> {
+  const superAdmin = await superAdminSession(request);
+  const response = await request.post(`${backendApi}/users`, {
+    headers: { Authorization: `Bearer ${superAdmin.token}` },
+    data: { ...admin, role: 'ADMIN' },
+  });
+  assertNotRateLimited(response.status(), 'admin account creation');
+  expect(response.status(), 'Create unique ADMIN account').toBe(201);
+  return admin;
+}
+
+export async function createReadOnlyStaff(request: APIRequestContext): Promise<{ admin: TestAdmin; session: BrowserAuthSession }> {
+  if (!readOnlyStaffPromise) {
+    readOnlyStaffPromise = (async () => {
+      const admin = await createAdminAccount(request);
+      const session = await loginWithApi(request, admin.email, admin.password);
+      return { admin, session };
+    })();
+  }
+  return readOnlyStaffPromise;
 }

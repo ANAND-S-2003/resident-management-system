@@ -1,5 +1,5 @@
 import { apiRequest } from '@/lib/api/client';
-import type { NotificationItem, NotificationQuery, NotificationReadResponse, PageResponse, RequestCreateRequest, RequestHistoryEntry, RequestQuery, Service, ServiceRequest, ServiceQuery, ChangePasswordRequest } from '@/lib/api/types';
+import type { DashboardSummary, NotificationItem, NotificationQuery, NotificationReadResponse, PageResponse, RequestCreateRequest, RequestHistoryEntry, RequestQuery, Service, ServiceRequest, ServiceQuery, ChangePasswordRequest, UpdateServiceRequestBody } from '@/lib/api/types';
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
   const search = new URLSearchParams();
@@ -9,9 +9,11 @@ function queryString(params: Record<string, string | number | boolean | undefine
 }
 
 export const requestApi = {
+  dashboardSummary: (signal?: AbortSignal) => apiRequest<DashboardSummary>('/dashboard/summary', { signal }),
   services: (params: ServiceQuery = {}, signal?: AbortSignal) => apiRequest<PageResponse<Service>>(`/services${queryString(params as Record<string, string | number | boolean | undefined>)}`, { signal }),
   requests: (params: RequestQuery = {}, signal?: AbortSignal) => apiRequest<PageResponse<ServiceRequest>>(`/requests${queryString(params as Record<string, string | number | boolean | undefined>)}`, { signal }),
   request: (id: number, signal?: AbortSignal) => apiRequest<ServiceRequest>(`/requests/${encodeURIComponent(String(id))}`, { signal }),
+  updateRequest: (id: number, body: UpdateServiceRequestBody) => apiRequest<ServiceRequest>(`/requests/${encodeURIComponent(String(id))}`, { method: 'PATCH', body }),
   history: (id: number, signal?: AbortSignal) => apiRequest<RequestHistoryEntry[]>(`/requests/${encodeURIComponent(String(id))}/history`, { signal }),
   createRequest: (body: RequestCreateRequest) => apiRequest<ServiceRequest>('/requests', { method: 'POST', body }),
   notifications: (params: NotificationQuery = {}, signal?: AbortSignal) => apiRequest<PageResponse<NotificationItem>>(`/notifications${queryString(params as Record<string, string | number | boolean | undefined>)}`, { signal }),
