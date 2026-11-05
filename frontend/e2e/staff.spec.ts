@@ -15,7 +15,7 @@ import {
 } from './support/api';
 import { signIn } from './support/auth';
 import { headings, staffRequestDetailHeading } from './support/headings';
-import { mainContent, mainHeading, navigationLink } from './support/landmarks';
+import { mainContent, mainHeading, navigateTo } from './support/landmarks';
 import { monitorExpectedBrowserFailures } from './support/expected-browser-failures';
 
 interface CreatedRequest { id: number; service: { name: string } }
@@ -62,7 +62,7 @@ test('staff dashboard, request search, transitions, rejection, and resident noti
   const pendingCard = mainContent(page).locator(`a[href="/admin/requests?status=PENDING"] strong`);
   await expect(pendingCard, 'Pending count includes this newly created request').toHaveText(String(summaryBefore.byStatus.PENDING + 1), { timeout: 10_000 });
   const initialListResponse = page.waitForResponse((response) => response.request().method() === 'GET' && new URL(response.url()).pathname.endsWith('/requests'));
-  await navigationLink(page, 'Requests').click();
+  await navigateTo(page, 'Requests');
   expect((await initialListResponse).status(), 'Staff request list response').toBe(200);
   await expect(mainHeading(page, headings.staffRequests)).toBeVisible();
   const q = mainContent(page).getByRole('textbox', { name: 'Search residents' });
@@ -182,10 +182,11 @@ test('staff request list uses stacked cards at a phone viewport without horizont
   await page.setViewportSize({ width: 375, height: 667 });
   await signedInAdmin(page, admin.email, admin.password);
   const listResponse = page.waitForResponse((response) => response.request().method() === 'GET' && new URL(response.url()).pathname.endsWith('/requests'));
-  await navigationLink(page, 'Requests').click();
+  await navigateTo(page, 'Requests');
   expect((await listResponse).status(), 'Mobile staff request list response').toBe(200);
   await expect(mainHeading(page, headings.staffRequests)).toBeVisible();
   await expect(mainContent(page).locator('.staff-request-mobile-cards')).toBeVisible();
+  await expect(mainContent(page).locator('.staff-request-table')).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Staff list fits the 375px viewport').toBe(true);
   expect(resident.requestId, 'Resident scenario includes its unique request').not.toBeNull();
 });
