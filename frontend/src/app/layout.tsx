@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import type { Role } from '@/lib/api/types';
 import { ROLES } from '@/lib/constants';
 import { useUnreadCount } from '@/features/requests/hooks';
+import { NotificationsLinkContent } from '@/features/notifications/NotificationsLinkContent';
 
 interface NavItem { label: string; to: string; roles: Role[] }
 const navItems: NavItem[] = [
@@ -28,7 +29,7 @@ function NavigationLink({ item, onNavigate }: { item: NavItem; onNavigate?: () =
   const className = ({ isActive }: { isActive: boolean }) => isActive ? 'nav-link active' : 'nav-link';
   if (item.to === '/resident/notifications') {
     const count = unread.data?.count ?? 0;
-    return <NavLink to={item.to} end className={className} onClick={onNavigate}>Notifications{count > 0 && <> <span aria-hidden="true"><Badge tone="info">{count}</Badge></span></>}<span className="sr-only">, {count} unread</span></NavLink>;
+    return <NavLink to={item.to} end className={className} onClick={onNavigate}><NotificationsLinkContent count={count}>{count > 0 && <span aria-hidden="true"> <Badge tone="info">{count}</Badge></span>}</NotificationsLinkContent></NavLink>;
   }
   return <NavLink to={item.to} end={item.to === '/admin' || item.to === '/resident'} className={className} onClick={onNavigate}>{item.label}</NavLink>;
 }

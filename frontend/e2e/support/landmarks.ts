@@ -5,6 +5,11 @@ export const mainNavigation = (page: Page): Locator => page.getByRole('navigatio
 export const appHeader = (page: Page): Locator => page.getByRole('banner');
 export const mobileDrawer = (page: Page): Locator => page.getByRole('dialog', { name: 'Mobile navigation' });
 
+/** Mirrors src/features/notifications/notifications-label.ts for browser-test locators. */
+export function notificationsLinkName(count: number): string {
+  return count > 0 ? `Notifications, ${count} unread` : 'Notifications';
+}
+
 export function mainHeading(page: Page, name: string): Locator {
   return mainContent(page).getByRole('heading', { name, exact: true });
 }

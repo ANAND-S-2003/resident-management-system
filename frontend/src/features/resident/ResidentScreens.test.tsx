@@ -1,6 +1,6 @@
 import { createMemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { App } from '@/app/App';
@@ -10,6 +10,7 @@ import type { NotificationItem, ServiceRequest } from '@/lib/api/types';
 import { getApplicationToday } from '@/lib/dates';
 import { testApiUrl } from '@/test/api-url';
 import { server } from '@/test/server';
+import { notificationsLabel } from '@/features/notifications/notifications-label';
 
 const userProfile = { id: 55, fullName: 'Ravi Resident', email: 'ravi@example.test', role: 'USER' as const, flatNumber: 'B-55', active: true };
 const requestItem: ServiceRequest = {
@@ -73,6 +74,8 @@ describe('resident screens in the production app composition', () => {
     server.use(http.get(testApiUrl('/notifications/unread-count'), () => HttpResponse.json({ count: 6 })));
     renderApp('/resident');
     expect(await screen.findByRole('heading', { name: 'Welcome, Ravi' })).toBeInTheDocument();
+    expect(await within(screen.getByRole('navigation', { name: 'Main navigation' })).findByRole('link', { name: notificationsLabel(6) })).toBeVisible();
+    expect(await within(screen.getByRole('main')).findByRole('link', { name: notificationsLabel(6) })).toBeVisible();
     await waitFor(() => expect(document.querySelector('a[href="/resident/requests?status=PENDING"]')).not.toBeNull());
     expect(document.querySelector('a[href="/resident/requests?status=IN_PROGRESS"]')).not.toBeNull();
     expect(document.querySelector('a[href="/resident/requests?overdue=true"]')).not.toBeNull();
@@ -82,9 +85,13 @@ describe('resident screens in the production app composition', () => {
 
   it('keeps visible dashboard card text inside each link accessible name', async () => {
     renderApp('/resident');
-    const notificationsCard = await screen.findByRole('link', { name: 'Notifications 0 Unread' });
+    expect(await screen.findByRole('heading', { name: 'Welcome, Ravi' })).toBeInTheDocument();
+    const navNotifications = within(screen.getByRole('navigation', { name: 'Main navigation' }));
+    const main = within(screen.getByRole('main'));
+    const notificationsCard = await main.findByRole('link', { name: notificationsLabel(0) });
     expect(notificationsCard).not.toHaveAttribute('aria-label');
-    expect(notificationsCard).toHaveAccessibleName('Notifications 0 Unread');
+    expect(notificationsCard).toHaveAccessibleName(notificationsLabel(0));
+    expect(await navNotifications.findByRole('link', { name: notificationsLabel(0) })).toBeVisible();
     const statLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('.resident-stat-link'));
     expect(statLinks).toHaveLength(6);
     for (const link of statLinks) {

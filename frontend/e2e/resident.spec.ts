@@ -15,7 +15,7 @@ import {
 } from './support/api';
 import { signIn, signOut } from './support/auth';
 import { headings, residentDashboardHeading, residentFeatureHeading, type ResidentFeaturePage } from './support/headings';
-import { mainContent, mainHeading, navigationLink } from './support/landmarks';
+import { mainContent, mainHeading, navigationLink, notificationsLinkName } from './support/landmarks';
 import { monitorExpectedBrowserFailures } from './support/expected-browser-failures';
 
 async function waitForHeading(page: Page, name: string) {
@@ -95,15 +95,25 @@ test('resident request lifecycle, notifications, ownership, and password change 
     data: { status: 'IN_PROGRESS' },
   });
   expect(transition.status(), 'Admin status transition response').toBe(200);
+  const unreadCountResponsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
+    && new URL(response.url()).pathname.endsWith('/notifications/unread-count'));
   await page.reload();
-  const notificationsLink = navigationLink(page, 'Notifications, 1 unread');
+  const unreadCountResponse = await unreadCountResponsePromise;
+  expect(unreadCountResponse.status(), 'Unread-count response after status change').toBe(200);
+  expect(await unreadCountResponse.json(), 'Unread count after status change').toMatchObject({ count: 1 });
+  const notificationsLink = navigationLink(page, notificationsLinkName(1));
   await expect(notificationsLink).toBeVisible({ timeout: 10_000 });
   await notificationsLink.click();
   await waitForHeading(page, headings.notifications);
   const notificationMessage = mainContent(page).getByText(`Your request #${requestId} for ${serviceName} is now IN_PROGRESS.`, { exact: true });
   await expect(notificationMessage).toBeVisible();
+  const readCountResponsePromise = page.waitForResponse((response) => response.request().method() === 'GET'
+    && new URL(response.url()).pathname.endsWith('/notifications/unread-count'));
   await mainContent(page).getByRole('button', { name: 'Mark as read', exact: true }).click();
-  await expect(navigationLink(page, 'Notifications, 0 unread')).toBeVisible({ timeout: 10_000 });
+  const readCountResponse = await readCountResponsePromise;
+  expect(readCountResponse.status(), 'Unread-count response after marking read').toBe(200);
+  expect(await readCountResponse.json(), 'Unread count after marking read').toMatchObject({ count: 0 });
+  await expect(navigationLink(page, notificationsLinkName(0))).toBeVisible({ timeout: 10_000 });
 
   await page.goto(requestPath);
   await waitForHeading(page, residentFeatureHeading('request-detail', { requestId, serviceName: serviceName! }));
