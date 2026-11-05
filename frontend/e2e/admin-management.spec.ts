@@ -104,7 +104,6 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
   request,
 }) => {
   test.setTimeout(90_000);
-  const browserFailures = monitorExpectedBrowserFailures(page);
   const staff = await createReadOnlyStaff(request);
   const resident = residentCredentials();
   await signIn(page, staff.admin.email, staff.admin.password);
@@ -150,6 +149,7 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
   );
   const residentContext = await browser.newContext();
   const residentPage = await residentContext.newPage();
+  const browserFailures = monitorExpectedBrowserFailures(residentPage);
   await installSession(residentPage, residentSession);
   await residentPage.goto("/resident");
   await expect(
