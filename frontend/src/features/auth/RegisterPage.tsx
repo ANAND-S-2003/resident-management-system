@@ -37,5 +37,5 @@ export function RegisterPage() {
     <FormField id="password" label="Password" required error={errors.password?.message}><div className="password-control"><Input id="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...register('password')} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-error' : undefined} /><button type="button" className="password-toggle" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? 'Hide' : 'Show'}</button></div></FormField>
     <FormField id="confirmPassword" label="Confirm password" required error={errors.confirmPassword?.message}><Input id="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...register('confirmPassword')} aria-invalid={!!errors.confirmPassword} aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined} /></FormField>
     <Button type="submit" loading={isSubmitting} className="auth-submit">Create account</Button>
-  </form><p className="auth-footer">Already registered? <Link to="/login">Sign in</Link></p></Card></main>;
+  </form><p className="auth-footer">Already registered? <Link to="/login">Sign in</Link></p><p className="auth-footer"><Link to="/contact">Contact us</Link></p></Card></main>;
 }

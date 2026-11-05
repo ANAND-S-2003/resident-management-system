@@ -35,5 +35,5 @@ export function LoginPage() {
     <FormField id="email" label="Email" required error={errors.email?.message}><Input id="email" type="email" autoComplete="username" inputMode="email" autoCapitalize="none" {...register('email')} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-error' : undefined} /></FormField>
     <FormField id="password" label="Password" required error={errors.password?.message}><div className="password-control"><Input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" {...register('password')} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-error' : undefined} /><button type="button" className="password-toggle" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? 'Hide' : 'Show'}</button></div></FormField>
     <Button type="submit" loading={isSubmitting} className="auth-submit">Sign in</Button>
-  </form><p className="auth-footer">New to the community? <Link to="/register">Create an account</Link></p></Card></main>;
+  </form><p className="auth-footer">New to the community? <Link to="/register">Create an account</Link></p><p className="auth-footer"><Link to="/contact">Contact us</Link></p></Card></main>;
 }

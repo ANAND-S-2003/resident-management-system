@@ -59,3 +59,29 @@ button, input, textarea, select { font: inherit; }
 .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 @media (max-width: 699px) { .staff-request-filters { display: grid; }.staff-request-filters > * { min-width: 0; width: 100%; }.staff-inline-action { align-items: stretch; }.staff-request-person { display: grid; } }
 @media (min-width: 900px) { .menu-button, .drawer-backdrop { display: none; }.app-shell { display: grid; grid-template-columns: 15rem 1fr; grid-template-rows: 4rem 1fr; }.topbar { grid-column: 1 / -1; }.sidebar { display: block; grid-column: 1; grid-row: 2; border-right: 1px solid rgb(var(--line)); background: rgb(var(--surface)); padding: 1rem .75rem; }.main-content { grid-column: 2; grid-row: 2; padding: 2rem; }.topbar > a { margin-right: auto; margin-left: 1rem; }.topbar-user { margin-left: auto; } }
+
+/* Management pages share a compact toolbar and switch tables to cards on phones. */
+.list-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 1rem; }
+.list-toolbar .form-field { flex: 1 1 12rem; min-width: min(100%, 12rem); }
+.management-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; margin-block: 1rem; }
+.management-table { width: 100%; border-collapse: collapse; background: rgb(var(--surface)); }
+.management-table th, .management-table td { padding: .75rem; border-bottom: 1px solid rgb(var(--line)); text-align: left; vertical-align: top; }
+.management-table th { color: rgb(var(--muted)); font-size: .875rem; }
+.management-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.management-cards { display: none; }
+.management-card { display: grid; gap: .5rem; min-width: 0; overflow-wrap: anywhere; }
+.management-card h2, .management-card p { margin: 0; }
+.truncate-cell { max-width: 24rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.form-error-summary { color: #b91c1c; }
+@media (prefers-color-scheme: dark) { .form-error-summary { color: #fca5a5; } }
+.message-detail dl { display: grid; gap: .75rem; }
+.message-detail dl > div { display: grid; grid-template-columns: minmax(7rem, 12rem) 1fr; gap: .75rem; }
+.message-detail dt { font-weight: 700; }
+.message-detail dd { margin: 0; overflow-wrap: anywhere; }
+.plain-text-message { white-space: pre-wrap; overflow-wrap: anywhere; }
+.contact-card { width: min(100%, 48rem); margin-inline: auto; }
+.contact-card form { display: grid; gap: 1rem; }
+.contact-back { text-align: center; }
+.app-footer { padding: 1rem; text-align: center; }
+@media (max-width: 699px) { .management-table-wrap { display: none; }.management-cards { display: grid; gap: 1rem; margin-block: 1rem; }.management-actions > .button { flex: 1 1 auto; } }
+@media (max-width: 380px) { .list-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); }.list-toolbar .form-field { min-width: 0; }.message-detail dl > div { grid-template-columns: minmax(0, 1fr); gap: .2rem; } }

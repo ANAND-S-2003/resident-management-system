@@ -98,5 +98,6 @@ export function AppShell() {
       </aside>
     </div>
     <main id="main-content" className="main-content"><Outlet /></main>
+    <footer className="app-footer"><Link to="/contact">Contact us</Link></footer>
   </div>;
 }

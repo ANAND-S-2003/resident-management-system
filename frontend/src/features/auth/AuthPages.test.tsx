@@ -12,7 +12,7 @@ import { AuthProvider } from './AuthProvider';
 import { LoginPage } from './LoginPage';
 import { RegisterPage } from './RegisterPage';
 import { AppShell } from '@/app/layout';
-import { ComingSoon } from '@/app/pages';
+import { PageHeader } from '@/components/ui';
 import { writeSession } from './session';
 import { queryKeys } from '@/lib/query-keys';
 
@@ -22,6 +22,7 @@ function renderAuth(node: ReactNode) {
 }
 function LocationProbe() { return <output aria-label="Current path">{useLocation().pathname}</output>; }
 const loginResponse = { accessToken: 'test-token', tokenType: 'Bearer', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user: { id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12' } };
+function TestPage({ title }: { title: string }) { return <PageHeader title={title} />; }
 
 describe('authentication pages', () => {
   beforeEach(() => { server.resetHandlers(); });
@@ -67,7 +68,7 @@ describe('authentication pages', () => {
     writeSession({ token: 'stored-token', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user: { id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true } });
     server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.json({ id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true })));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const shell = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<ComingSoon title="Resident dashboard" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
+    const shell = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<TestPage title="Resident dashboard" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
     await screen.findByRole('heading', { name: 'Resident dashboard' });
     await waitFor(() => expect(client.getQueryState(queryKeys.notifications.unreadCount)?.status).toBe('success'));
     expect((await axe.run(shell.container, { rules: { 'color-contrast': { enabled: false } } })).violations).toEqual([]);
@@ -77,7 +78,7 @@ describe('authentication pages', () => {
     writeSession({ token: 'stored-token', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user: { id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true } });
     server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.json({ id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true })));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<ComingSoon title="Resident dashboard" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<TestPage title="Resident dashboard" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
     await screen.findByRole('heading', { name: 'Resident dashboard' });
     const menuButton = screen.getByRole('button', { name: 'Open navigation menu' });
     await user.click(menuButton);
@@ -111,7 +112,7 @@ describe('authentication pages', () => {
     writeSession({ token: 'stored-token', expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), user: { id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true } });
     server.use(http.get(testApiUrl('/auth/me'), () => HttpResponse.json({ id: 12, fullName: 'Resident', email: 'resident@example.test', role: 'USER', flatNumber: 'A-12', active: true })));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<ComingSoon title="Resident dashboard" />} /><Route path="/resident/requests" element={<ComingSoon title="My requests" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/resident']}><AuthProvider><Routes><Route element={<AppShell />}><Route path="/resident" element={<TestPage title="Resident dashboard" />} /><Route path="/resident/requests" element={<TestPage title="My requests" />} /></Route></Routes></AuthProvider></MemoryRouter></QueryClientProvider>);
     await screen.findByRole('heading', { name: 'Resident dashboard' });
     await user.click(screen.getByRole('button', { name: 'Open navigation menu' }));
     await user.click(screen.getByRole('link', { name: 'My requests' }));

@@ -5,6 +5,15 @@ export const queryKeys = {
     all: ['services'] as const,
     lists: () => ['services', 'list'] as const,
     list: (params: unknown) => ['services', 'list', params] as const,
+    details: () => ['services', 'detail'] as const,
+    detail: (id: number) => ['services', 'detail', id] as const,
+  },
+  users: {
+    all: ['users'] as const,
+    lists: () => ['users', 'list'] as const,
+    list: (params: unknown) => ['users', 'list', params] as const,
+    details: () => ['users', 'detail'] as const,
+    detail: (id: number) => ['users', 'detail', id] as const,
   },
   requests: {
     all: ['requests'] as const,
@@ -31,5 +40,10 @@ export const queryKeys = {
     all: ['dashboard'] as const,
     summary: ['dashboard', 'summary'] as const,
   },
-  contactQueries: ['contact-queries'] as const,
+  contactQueries: {
+    all: ['contact-queries'] as const,
+    lists: () => ['contact-queries', 'list'] as const,
+    list: (params: unknown) => ['contact-queries', 'list', params] as const,
+    detail: (id: number) => ['contact-queries', 'detail', id] as const,
+  },
 };

@@ -36,6 +36,6 @@ Copy `.env.example` to an untracked `.env` for local development. The app fails 
 | `RMS_RATE_LIMIT_CONTACT_MAX` | Optional; `5` | Anonymous contact submissions per hour per client IP; integer 1-10000 |
 CORS allows only required methods and headers; no wildcard origins with credentials or authorization headers. JDBC sessions and Hibernate use UTC. Business dates use `RMS_TIMEZONE`. Login, registration, and anonymous contact rate limits use in-memory counters in single-instance v1; multi-instance needs shared storage such as Redis. Every 429 response includes `Retry-After` seconds.
 
-The rate-limit environment variables are optional overrides; their defaults preserve the documented v1 limits. Raising the login and registration values (for example to `1000`) is intended only for repeated local E2E runs, never production. The application fails fast if any override is not an integer from 1 through 10000.
+The rate-limit environment variables are optional overrides; their defaults preserve the documented v1 limits. Raising the login, registration, and contact values (for example to `1000`) is intended only for repeated local E2E runs, never production. The application fails fast if any override is not an integer from 1 through 10000. `scripts/start-backend-for-e2e.ps1` sets all three overrides for that local backend process only.
 
 The `demo` profile and sample data are future work for screenshots and must never run in production.

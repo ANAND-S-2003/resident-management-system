@@ -21,14 +21,14 @@ frontend/
     test/                Vitest setup and MSW handlers
 ```
 
-Resident dashboard, request creation/list/detail/history, notifications, account screens, the staff dashboard, and staff request list/detail management are implemented. Staff resident, service, message, and admin screens remain placeholders for later steps. The public contact page also remains a placeholder.
+Resident dashboard, request creation/list/detail/history, notifications, account screens, staff request management, resident/admin account management, service catalog, contact-message review, and the public contact form are implemented.
 
 ## Route map
 
 | Route | Access | Current page |
 |---|---|---|
 | `/login`, `/register` | Anonymous | Authentication forms |
-| `/contact` | Public | Coming soon |
+| `/contact` | Public; authenticated users may also submit | Contact form |
 | `/resident` | USER | Dashboard |
 | `/resident/requests` | USER | My requests (filters and pagination are stored in the URL query string) |
 | `/resident/requests/new` | USER | New service request |
@@ -37,8 +37,10 @@ Resident dashboard, request creation/list/detail/history, notifications, account
 | `/admin` | ADMIN or SUPER_ADMIN | Dashboard summary and attention lists |
 | `/admin/requests` | ADMIN or SUPER_ADMIN | All requests with URL-backed filters, search, sort, and pagination |
 | `/admin/requests/:id` | ADMIN or SUPER_ADMIN | Request details, history, and status/remarks management |
-| `/admin/residents`, `/admin/services`, `/admin/messages` | ADMIN or SUPER_ADMIN | Coming soon |
-| `/admin/admins` | SUPER_ADMIN | Coming soon |
+| `/admin/residents` | ADMIN or SUPER_ADMIN | Resident account management |
+| `/admin/services` | ADMIN or SUPER_ADMIN | Service catalog management |
+| `/admin/messages`, `/admin/messages/:id` | ADMIN or SUPER_ADMIN | Contact-query inbox and detail |
+| `/admin/admins` | SUPER_ADMIN | Admin account management |
 | `/account` | Any authenticated role | Profile and change password |
 | `/forbidden` | Public error page | Access denied |
 
@@ -81,6 +83,18 @@ Staff query keys use the shared factory in `src/lib/query-keys.ts`: `dashboard.s
 The staff list stores status, overdue, q, page, size and sort in the URL query string. Unknown status, sort, page and size values fall back or clamp to safe values; q is trimmed and capped at 100 Unicode code points, then applied after an approximately 400 ms debounce. The staff sort whitelist is `createdAt`, `requestDate`, `expectedCompletionDate` and `status`, in either direction, with `createdAt,desc` as the default. Status and overdue filters are sent together when both are selected; q is sent to the backend only in the staff view.
 
 Invalid or non-positive request IDs are treated as not found without an API call. Detail and history data are rendered from the documented request DTO and plain-array history response. A 409 `INVALID_STATUS_TRANSITION` or `CONCURRENT_MODIFICATION` tells staff that another update may have landed, then reloads the request and history. Validation field details map to the remarks control; forbidden, missing, rate-limit and network failures use friendly messages without exposing server text or error codes.
+
+## Account management and contact pages
+
+The user API and service catalog API are typed in `src/features/management/api.ts`; query functions pass TanStack Query abort signals through. Query keys include `users.list(params)`, `users.detail(id)`, `services.list(params)`, `services.detail(id)`, `contactQueries.list(params)`, and `contactQueries.detail(id)`. User mutations invalidate user lists, the affected detail, and the dashboard summary counts. Service mutations invalidate the shared service-list prefix (including the active service list used by request creation) and affected detail. Contact queries are read-only in the staff UI; contact creation does not cache message bodies.
+
+`UserManagementPage` handles both resident accounts (fixed `role=USER`) and admin accounts (fixed `role=ADMIN`, SUPER_ADMIN route only). `src/features/management/user-policy.ts` is the pure UI policy for target-role and self-deactivation controls; API authorization remains authoritative. Admin forms omit `flatNumber`; resident forms require it. Role is never editable. Deactivation requires confirmation and explains that the account is signed out immediately; reactivation is immediate. List `q`, active filter, sort, page and size are stored in the URL; invalid values fall back to defaults, page is nonnegative, and size is clamped to 1-100. Search is trimmed, capped at 100 Unicode code points, and debounced for approximately 400 ms. User sort fields are `createdAt`, `fullName`, `email`, and `role`.
+
+Service management uses URL-backed `q`, active, sort, page and size state. Service sorts are `name` and `createdAt`; name and description limits use Unicode code points. Deactivated services remain visible when the staff filter includes them and are unavailable to residents for new requests. The `ActivationBadge` always says Active or Inactive, so state is not communicated by color alone. Confirmation text explains that deactivation affects only new requests; existing request history remains intact.
+
+Contact messages use the documented paginated envelope, ordered by `createdAt,desc`; the detail route validates positive numeric IDs before requesting data. Sender identity is derived only from `submittedById`. Email links use an encoded mailto address. All message, name, subject and description text is rendered literally. The public contact form sends only name, email, subject and message. It prefills name/email for authenticated users; anonymous requests have no bearer token unless the visitor has an active session. The documented anonymous contact rate limit is five valid submissions per hour per client IP. Repeated local E2E runs use `scripts/start-backend-for-e2e.ps1`, which sets the optional local login, registration and contact limits to 1000 for that backend process only; do not use those overrides in production.
+
+The public contact link is available on sign-in, registration and the authenticated shell. No ComingSoon page or route remains.
 
 ## Design tokens and components
 
@@ -169,6 +183,6 @@ npm run e2e
 
 The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. Axe checks use one test per page state and color scheme (login, register, resident shell, resident mobile drawer, SUPER_ADMIN shell, SUPER_ADMIN mobile drawer), each with a 90-second timeout. Each scan attaches its full axe JSON result; failures list every serious or critical rule, impact, selector, and node summary. The suite requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.
 
-The read-only shell and axe scenarios reuse one resident registered through the API per Playwright worker. UI registration remains tested by the registration flow and resident lifecycle tests. Registration is normally limited to 10 attempts per rolling hour per client IP, and failed logins to 5 per rolling 15 minutes per IP/email. For repeated local E2E runs, start the backend in a separate PowerShell window from the repository root with `.scripts\start-backend-for-e2e.ps1`; it loads `.env`, starts MySQL, and raises only the local backend process's registration and login limits to 1000. These overrides are for local E2E runs only and must never be used in production. Restarting the backend resets its in-memory counters.
+The read-only shell and axe scenarios reuse one resident registered through the API per Playwright worker. UI registration remains tested by the registration flow and resident lifecycle tests. Registration is normally limited to 10 attempts per rolling hour per client IP, failed logins to 5 per rolling 15 minutes per IP/email, and anonymous contact messages to 5 per hour per IP. For repeated local E2E runs, start the backend in a separate PowerShell window from the repository root with `.\scripts\start-backend-for-e2e.ps1`; it loads `.env`, starts MySQL, and raises only the local backend process's registration, login and contact limits to 1000. These overrides are for local E2E runs only and must never be used in production. Restarting the backend resets its in-memory counters.
 
-Staff browser tests create an ADMIN through the configured SUPER_ADMIN, seed uniquely searchable requests through the API, and exercise both status transitions and concurrency conflict refresh. Axe scans cover the staff dashboard, request list, request detail, and an open status dialog in light and dark schemes. Staff resident, service, message and admin-management placeholders are not covered as feature pages yet.
+Staff browser tests create an ADMIN through the configured SUPER_ADMIN, seed uniquely searchable requests through the API, and exercise both status transitions and concurrency conflict refresh. Management browser tests cover account administration, service activation, contact submissions and message review; all test records use unique values. Anonymous contact submissions per E2E run are kept within the backend limit, and a 429 tells the tester to restart the backend or use the local E2E launcher. Axe scans cover staff and management screens in light and dark schemes. The list pages switch to stacked cards below 700px and are designed to fit 320px viewports.

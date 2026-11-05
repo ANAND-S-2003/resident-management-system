@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'load-env.ps1')
 $env:RMS_RATE_LIMIT_REGISTER_MAX = '1000'
 $env:RMS_RATE_LIMIT_LOGIN_MAX = '1000'
+$env:RMS_RATE_LIMIT_CONTACT_MAX = '1000'
 
 Push-Location (Join-Path $PSScriptRoot '..')
 try {

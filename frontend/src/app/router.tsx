@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { Spinner } from '@/components/ui';
 import { AppShell } from './layout';
@@ -6,13 +6,11 @@ import { PublicOnly, RequireAuth, RequireRole } from './guards';
 import { homeForRole } from './guards';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { ROLES } from '@/lib/constants';
-import { ComingSoon, ForbiddenPage, NotFoundPage, RootErrorFallback } from './pages';
+import { ForbiddenPage, NotFoundPage, RootErrorFallback } from './pages';
 import { RootLayout } from './RootLayout';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
 
-function Placeholder({ title }: { title: string }) { return <ComingSoon title={title} />; }
-const lazyPage = (title: string) => lazy(async () => ({ default: (() => <Placeholder title={title} />) as ComponentType }));
 const ResidentHome = lazy(() => import('@/features/dashboard/ResidentDashboard').then((module) => ({ default: module.ResidentDashboard })));
 const ResidentRequests = lazy(() => import('@/features/requests/RequestListPage').then((module) => ({ default: module.RequestListPage })));
 const NewRequest = lazy(() => import('@/features/requests/RequestFormPage').then((module) => ({ default: module.RequestFormPage })));
@@ -22,7 +20,12 @@ const Account = lazy(() => import('@/features/account/AccountPage').then((module
 const AdminHome = lazy(() => import('@/features/dashboard/StaffDashboard').then((module) => ({ default: module.StaffDashboard })));
 const AdminRequests = lazy(() => import('@/features/requests/StaffRequestListPage').then((module) => ({ default: module.StaffRequestListPage })));
 const AdminRequestDetails = lazy(() => import('@/features/requests/StaffRequestDetailPage').then((module) => ({ default: module.StaffRequestDetailPage })));
-const Residents = lazyPage('Residents'); const Services = lazyPage('Services'); const Messages = lazyPage('Messages'); const Admins = lazyPage('Admins'); const Contact = lazyPage('Contact');
+const Residents = lazy(() => import('@/features/management/UserManagementPage').then((module) => ({ default: module.UserManagementPage })));
+const Admins = lazy(() => import('@/features/management/UserManagementPage').then((module) => ({ default: () => <module.UserManagementPage adminsOnly /> })));
+const Services = lazy(() => import('@/features/management/ServicesPage').then((module) => ({ default: module.ServicesPage })));
+const Messages = lazy(() => import('@/features/management/MessagesPages').then((module) => ({ default: module.MessagesPage })));
+const MessageDetails = lazy(() => import('@/features/management/MessagesPages').then((module) => ({ default: module.MessageDetailPage })));
+const Contact = lazy(() => import('@/features/management/ContactPage').then((module) => ({ default: module.ContactPage })));
 const fallback = <div className="route-loading" role="status"><Spinner />Loading page...</div>;
 
 export const appRoutes: RouteObject[] = [{
@@ -49,6 +52,7 @@ export const appRoutes: RouteObject[] = [{
         { path: '/admin/residents', element: <Suspense fallback={fallback}><Residents /></Suspense> },
         { path: '/admin/services', element: <Suspense fallback={fallback}><Services /></Suspense> },
         { path: '/admin/messages', element: <Suspense fallback={fallback}><Messages /></Suspense> },
+        { path: '/admin/messages/:id', element: <Suspense fallback={fallback}><MessageDetails /></Suspense> },
       ] },
       { element: <RequireRole roles={[ROLES[2]]} />, children: [{ path: '/admin/admins', element: <Suspense fallback={fallback}><Admins /></Suspense> }] },
       { element: <RequireRole roles={[...ROLES]} />, children: [{ path: '/account', element: <Suspense fallback={fallback}><Account /></Suspense> }] },
