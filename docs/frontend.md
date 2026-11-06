@@ -146,7 +146,7 @@ Brand values live in `src/config/branding.ts`. To add a logo, set `logoSrc` to a
 
 ## Run locally (Windows PowerShell)
 
-From the repository root, open a PowerShell window for the backend and database using the [README local run steps](../README.md#backend-local-run-windows-powershell). Then open a frontend window:
+From the repository root, open a PowerShell window for the backend and database using the [README local run steps](../README.md#run-locally-in-five-steps-windows-powershell). Then open a frontend window:
 
 ```powershell
 cd frontend
@@ -163,6 +163,7 @@ From `frontend/`:
 ```powershell
 npm run typecheck
 npm run lint
+npm run format:check
 npm run test -- --run
 npm run build
 ```
@@ -171,7 +172,7 @@ Vitest uses jsdom, React Testing Library, jest-dom, user-event and MSW v2. Keep 
 
 ## Browser end-to-end tests (Windows PowerShell)
 
-Start MySQL and the backend using the repository's [README local-run steps](../README.md#backend-local-run-windows-powershell), and keep the backend running. In another PowerShell window, load the environment variables (including the super-admin login used by the suite), then install Chromium once and run the real-browser suite:
+Start MySQL and the backend using the repository's [README local-run steps](../README.md#run-locally-in-five-steps-windows-powershell), and keep the backend running. In another PowerShell window, load the environment variables (including the super-admin login used by the suite), then install Chromium once and run the real-browser suite:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -181,7 +182,7 @@ npm run e2e:install
 npm run e2e
 ```
 
-The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL, status), console messages, and page errors; bodies and authorization headers are never recorded, and credential-like text is redacted. Axe checks use one test per page state and color scheme (login, register, resident shell, resident mobile drawer, SUPER_ADMIN shell, SUPER_ADMIN mobile drawer), each with a 90-second timeout. Each scan attaches its full axe JSON result; failures list every serious or critical rule, impact, selector, and node summary. The suite requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.
+The Playwright configuration starts Vite on `http://localhost:5173` and reuses an existing server. Tests call the backend on `http://localhost:8080`, create uniquely named test residents, and do not delete records. Failed tests attach browser request/response metadata (method, URL, status), console messages, and page errors; bodies and authorization header values are never recorded (diagnostics record only whether an Authorization header was present), and credential-like text is redacted. Axe checks use one test per page state and color scheme (login, register, resident shell, resident mobile drawer, SUPER_ADMIN shell, SUPER_ADMIN mobile drawer), each with a 90-second timeout. Each scan attaches its full axe JSON result; failures list every serious or critical rule, impact, selector, and node summary. The suite requires `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD`; values are never printed.
 
 The read-only shell and axe scenarios reuse one resident registered through the API per Playwright worker. UI registration remains tested by the registration flow and resident lifecycle tests. Registration is normally limited to 10 attempts per rolling hour per client IP, failed logins to 5 per rolling 15 minutes per IP/email, and anonymous contact messages to 5 per hour per IP. For repeated local E2E runs, start the backend in a separate PowerShell window from the repository root with `.\scripts\start-backend-for-e2e.ps1`; it loads `.env`, starts MySQL, and raises only the local backend process's registration, login and contact limits to 1000. These overrides are for local E2E runs only and must never be used in production. Restarting the backend resets its in-memory counters.
 

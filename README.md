@@ -1,40 +1,119 @@
 # Resident Management System
 
-Resident Management System (RMS), a role-based residential community service-request application. The backend v1 API is complete; see the [authoritative API contract](docs/api.md).
+[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
 
-## Planned stack
+> Replace `OWNER/REPO` in the CI badge URL after publishing this repository.
 
-- Backend: Java 17, Spring Boot 3.x, Maven 3.9+, Spring Security/JWT, Spring Data JPA, Flyway, MySQL 8.4 LTS
-- Frontend: React, Vite, React Router, TanStack Query, fetch; Node.js 22 and npm
-- Tests: JUnit 5/Testcontainers, Vitest/React Testing Library, Cucumber
-- Packaging and CI: Docker Desktop, Docker Compose, GitHub Actions
+Resident Management System (RMS) is a role-based web application for residential communities. Residents submit and track service requests; staff manage requests, accounts, services, and contact messages.
 
-## Backend local run (Windows PowerShell)
+![Resident dashboard screenshot placeholder](docs/screenshots/resident-dashboard.png)
+![Staff request management screenshot placeholder](docs/screenshots/staff-requests.png)
 
-1. From the repository root, copy `.env.example` to `.env` and replace its dummy values with local development values.
-2. Start MySQL: `docker compose up -d db`.
-3. Load variables into the current PowerShell session: `. .\scripts\load-env.ps1`.
-4. In that same session, start the backend: `mvn spring-boot:run` from `backend/`.
-5. Check `http://localhost:8080/actuator/health`.
-6. Stop the application with Ctrl+C, then stop MySQL from the repository root with `docker compose down`.
+Add screenshots under `docs/screenshots/`; the image above is a placeholder until then.
 
-## Smoke test
+## Features by role
 
-Use two PowerShell windows. These steps run the end-to-end smoke test against the local backend; it creates uniquely named sample records and does not delete data.
+- **USER (resident):** register, sign in, submit and track service requests, receive in-app status notifications, manage account details, and contact staff.
+- **ADMIN:** manage resident accounts and the service catalog, triage and update requests, review contact messages, and view the staff dashboard.
+- **SUPER_ADMIN:** all ADMIN capabilities, plus admin-account management and the active-admin dashboard count.
+- **Public visitors:** submit a contact query and register as a resident.
 
-**Window 1** (repository root):
+The backend v1 REST API is implemented and described in the [authoritative API contract](docs/api.md). The app contains no third-party company branding.
+
+## Technology
+
+- Backend: Java 17, Spring Boot 3.x, Maven 3.9+, Spring Security, JWT, Spring Data JPA, Flyway, MySQL 8.4 LTS.
+- Frontend: React 18, Vite, TypeScript, React Router, TanStack Query, React Hook Form, Zod, Tailwind CSS, and `fetch`.
+- Tests: JUnit 5 and Testcontainers; Vitest, React Testing Library, MSW, and Playwright with axe accessibility scans.
+- Packaging and CI: Docker Compose and GitHub Actions.
+
+See [environment requirements](docs/environment.md) for tool versions and verification commands.
+
+## Run locally in five steps (Windows PowerShell)
+
+1. Install the required tools from [docs/environment.md](docs/environment.md). Copy `.env.example` to `.env` and replace the dummy local values.
+2. Open PowerShell at the repository root and load the local variables:
+
+   ```powershell
+   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+   . .\scripts\load-env.ps1
+   ```
+
+3. In that same window, start MySQL and the backend:
+
+   ```powershell
+   docker compose up -d db
+   cd backend
+   mvn spring-boot:run
+   ```
+
+   Wait for the startup log, then check `http://localhost:8080/actuator/health`. Stop the backend with Ctrl+C and run `docker compose down` from the repository root when finished. Database files remain in the named Docker volume unless `docker compose down -v` is used.
+
+4. Open a second PowerShell window at the repository root and start the frontend:
+
+   ```powershell
+   cd frontend
+   npm ci
+   npm run dev
+   ```
+
+5. Open the Vite URL (normally `http://localhost:5173`). Sign in with the configured super-admin account or register a resident account.
+
+## Testing
+
+RMS has three test layers:
+
+1. **Unit and component tests:** backend JUnit tests and frontend Vitest tests run without a real database. Frontend checks include type checking, linting, formatting, UI tests, and jsdom accessibility checks.
+2. **Database integration tests:** Maven `*IT` tests use a real MySQL 8.4 Testcontainers database. They run as part of `mvn clean verify` and require a working Docker installation.
+3. **Browser end-to-end tests:** Playwright runs Chromium against the real backend and database. It covers user workflows, mobile layouts, and serious/critical axe scans in light and dark color schemes.
+
+Backend, from `backend/`:
+
+```powershell
+mvn clean verify
+```
+
+To run only `UserCatalogIT`:
+
+```powershell
+mvn clean verify "-Dit.test=UserCatalogIT"
+```
+
+Frontend, from `frontend/`:
+
+```powershell
+npm ci
+npm run typecheck
+npm run lint
+npm run format:check
+npm run test -- "--run"
+npm run build
+```
+
+### Browser end-to-end tests (Windows PowerShell)
+
+Start the database and backend using step 3 above, and keep that window open. For repeated local E2E runs, use the launcher in the backend window instead; it raises only that local process's in-memory rate limits:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\start-backend-for-e2e.ps1
+```
+
+In a second window, load the super-admin credentials and run Playwright:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 . .\scripts\load-env.ps1
-docker compose up -d db
-cd backend
-mvn spring-boot:run
+cd frontend
+npm run e2e:install
+npm run e2e
 ```
 
-Wait until the log says the application has started.
+The tests create uniquely named accounts and records and do not delete them. They need `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD` in the environment. Rate-limit overrides from the local E2E launcher are for development only and must never be used in production.
 
-**Window 2** (repository root):
+### Smoke test
+
+The Windows PowerShell smoke test is an HTTP-level check against an already running backend. Start the database and backend using step 3 above. In another PowerShell window at the repository root, load `.env` and run the script. It creates uniquely named records and does not delete them. Its fake-server helper can be run without Docker or the backend:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -42,62 +121,34 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\smoke-test.ps1
 ```
 
-Stop the application with Ctrl+C in Window 1, then run `docker compose down` from the repository root. Database data stays in the Docker volume unless you run `docker compose down -v`. Anonymous contact submissions are rate-limited to five per hour per client IP, so repeated smoke runs from the same IP can hit the documented limit until its rolling window expires.
-
-To check the HTTP helper without Docker or a running backend, run this local fake-server self-test from the repository root:
+The fake-server self-test command is:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test.selftest.ps1
 ```
 
-If PowerShell 7 is installed, you can also run `pwsh -NoProfile -File scripts/smoke-test.selftest.ps1`.
+The PowerShell smoke test is not run in GitHub Actions; CI uses backend tests and Playwright instead.
 
-## Backend verification
+## Design decisions
 
-From `backend/`, run `mvn clean verify` for the full suite, or `mvn clean verify -Dit.test=UserCatalogIT` to run only `UserCatalogIT`. The clean step removes stale compiled classes before compilation; the build must fail on any Java compile error. Database-backed integration tests require Docker.
+- All account types share one `users` table with a role column.
+- Overdue status is computed from expected date and request status; it is never stored.
+- Request status changes follow the documented transition graph and use optimistic locking to detect concurrent updates.
+- JWT access tokens expire after 60 minutes. Account deactivation is checked on each authenticated request and blocks the account immediately.
+- Login, registration, and anonymous contact rate limits use in-memory counters for the single-instance v1 deployment; multiple instances require shared storage.
+- User-supplied descriptions, remarks, and contact messages are rendered as plain text.
+- The interface uses RMS branding only; no third-party logo or contact details are included.
 
-## Frontend (Windows PowerShell)
+## Repository structure
 
-Start the backend using the steps above, then from the repository root run:
-
-```powershell
-cd frontend
-npm install
-npm run dev
+```text
+backend/                 Spring Boot API, entities, migrations, and tests
+frontend/                React application, unit tests, and Playwright tests
+docs/                    Requirements, data model, API, environment, frontend guide
+scripts/                 Windows PowerShell environment, smoke-test, and E2E helpers
+.github/workflows/       GitHub Actions CI
 ```
 
-Vite prints the development URL. To verify the frontend, run `npm run typecheck`, `npm run lint`, `npm run test -- --run`, and `npm run build` from `frontend/`. See [frontend architecture and routes](docs/frontend.md).
+## Contributing and security
 
-The resident area includes the dashboard, request creation/list/detail and status history, notifications, and account settings. Staff have resident and admin account management, service catalog management, contact-message review, a request dashboard/list/detail, and status/remarks management. The public contact form is available to visitors and signed-in users. Run unit tests and the real-backend browser suite from `frontend/`:
-
-```powershell
-npm run test -- "--run"
-npm run e2e:install
-npm run e2e
-```
-
-The E2E suite requires the database and backend to be running as described above, plus `RMS_SUPERADMIN_EMAIL` and `RMS_SUPERADMIN_PASSWORD` loaded in that PowerShell session. Staff workflow tests create ADMIN accounts through the super admin API, create uniquely named requests, exercise transitions and conflicts, and include mobile and axe scans. Test data is not deleted.
-
-Playwright creates uniquely named residents. Read-only resident scenarios reuse one API-registered account per worker; UI registration remains covered by the registration flows. To repeat the suite without the documented registration, login, or anonymous contact limits interrupting local runs, start the backend in a separate repository-root PowerShell window with `.\scripts\start-backend-for-e2e.ps1`. It loads `.env`, starts the database and sets `RMS_RATE_LIMIT_REGISTER_MAX`, `RMS_RATE_LIMIT_LOGIN_MAX`, and `RMS_RATE_LIMIT_CONTACT_MAX` to `1000` for that backend process only. These overrides are for local E2E runs only, never production. Restarting the backend also resets the in-memory counters; no rate-limit defaults are changed.
-
-### Frontend browser tests (Windows PowerShell)
-
-First start MySQL and the backend using the steps in [Backend local run](#backend-local-run-windows-powershell). Keep that window running. In a second PowerShell window from the repository root, load the same environment so the Playwright tests can sign in as the configured super admin:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-. .\scripts\load-env.ps1
-cd frontend
-npm run e2e:install
-npm run e2e
-```
-
-Run `npm run e2e:install` once to install Chromium. The E2E suite uses the real backend and database, creates uniquely named test residents, and leaves those records in the database.
-
-## Repository layout
-
-- `backend/` - Java backend skeleton and schema migrations
-- `frontend/` - React application foundation, authentication, and design system
-- `docs/` - requirements, data model, API, and environment guide
-- `.github/workflows/` - intentionally empty for now
-- `scripts/` - local environment helper scripts
+See [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), and [SECURITY.md](SECURITY.md) before making changes or reporting a vulnerability.
