@@ -7,6 +7,11 @@
 .vite/
 playwright-report/
 test-results/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Java
 *.class
@@ -16,7 +21,9 @@ hs_err_pid*
 
 # IDE/editor
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.iml
 .project
 .classpath
@@ -26,6 +33,7 @@ hs_err_pid*
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # Environment and secrets
 .env
