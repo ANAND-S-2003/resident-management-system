@@ -1,6 +1,10 @@
 import { expect, test as base, type Request } from "@playwright/test";
 
 interface RequestRecord {
+  sequence: number | null;
+  navigation: number;
+  pageUrl: string;
+  authorizationPresent: boolean;
   method: string;
   url: string;
   status: number | null;
@@ -47,8 +51,19 @@ export const test = base.extend<{ diagnostics: void }>({
         pageErrors: [],
       };
       const byRequest = new Map<Request, RequestRecord>();
+      let navigation = 0;
+      let apiSequence = 0;
+      page.on("framenavigated", (frame) => {
+        if (frame === page.mainFrame()) navigation += 1;
+      });
       page.on("request", (request) => {
+        const requestUrl = new URL(request.url());
+        const isApiRequest = requestUrl.pathname.startsWith("/api/v1/");
         const record: RequestRecord = {
+          sequence: isApiRequest ? ++apiSequence : null,
+          navigation,
+          pageUrl: safeUrl(page.url()),
+          authorizationPresent: Boolean(request.headers().authorization),
           method: request.method(),
           url: safeUrl(request.url()),
           status: null,
@@ -82,6 +97,20 @@ export const test = base.extend<{ diagnostics: void }>({
         await testInfo.attach("browser-diagnostics.json", {
           body: JSON.stringify(diagnostics, null, 2),
           contentType: "application/json",
+        });
+        const apiRequests = diagnostics.requests.filter(
+          (record) => record.sequence !== null,
+        );
+        const apiTable = [
+          "sequence\tnavigation\tpage URL\tmethod/path\tstatus\tAuthorization header present",
+          ...apiRequests.map(
+            (record) =>
+              `${record.sequence}\t${record.navigation}\t${record.pageUrl}\t${record.method} ${record.url}\t${record.status ?? "pending"}\t${record.authorizationPresent}`,
+          ),
+        ].join("\n");
+        await testInfo.attach("api-request-navigation-table.txt", {
+          body: apiTable,
+          contentType: "text/plain",
         });
       }
     },

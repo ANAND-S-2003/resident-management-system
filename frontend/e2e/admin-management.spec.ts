@@ -176,6 +176,13 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
   expect((await deactivateResponse).status()).toBe(200);
   await residentPage.goto("/resident/requests");
   await expect(mainHeading(residentPage, headings.login)).toBeVisible();
+  await expect
+    .poll(() =>
+      residentPage.evaluate(() =>
+        window.sessionStorage.getItem("rms.session.v1"),
+      ),
+    )
+    .toBeNull();
   const apiRequestCountAfterLogout = residentApiRequests.length;
   await residentPage.waitForTimeout(3_000);
   expect(
@@ -188,6 +195,13 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
     resident.password,
   );
   expect(badLogin.status()).toBe(401);
+  await expect
+    .poll(() =>
+      residentPage.evaluate(() =>
+        window.sessionStorage.getItem("rms.session.v1"),
+      ),
+    )
+    .toBeNull();
   await expect(
     mainContent(residentPage).getByText("Invalid email or password"),
   ).toBeVisible();
@@ -204,12 +218,15 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
     mainHeading(residentPage, `Welcome, ${resident.fullName.split(" ")[0]}`),
   ).toBeVisible();
   browserFailures.assertExpectedFailures([
+    // The navigation after deactivation performs the one failed startup check.
     {
       method: "GET",
       path: "/api/v1/auth/me",
       status: 401,
-      reason: "deactivated resident session is rejected during startup validation",
+      reason:
+        "deactivated resident session is rejected during startup validation",
     },
+    // The explicit bad-password attempt is the only other expected failure.
     {
       method: "POST",
       path: "/api/v1/auth/login",

@@ -179,10 +179,18 @@ export async function installSession(
   session: BrowserAuthSession,
 ): Promise<void> {
   await page.addInitScript(
-    ({ key, value }) => {
+    ({ key, value, installedFlag }) => {
+      // addInitScript runs before every navigation. Keep this injection one-shot
+      // so a rejected session is not restored on a later goto or reload.
+      if (window.sessionStorage.getItem(installedFlag) === "true") return;
+      window.sessionStorage.setItem(installedFlag, "true");
       window.sessionStorage.setItem(key, JSON.stringify(value));
     },
-    { key: sessionKey, value: session },
+    {
+      key: sessionKey,
+      value: session,
+      installedFlag: "rms.e2e.session-installed",
+    },
   );
 }
 
