@@ -1,0 +1,11 @@
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    org.hibernate.type.descriptor.sql: OFF
+server:
+  error:
+    include-exception: false
+    include-message: never
+    include-stacktrace: never

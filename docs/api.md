@@ -180,7 +180,7 @@ Response 200 `{"status":"UP"}` or 503 `{"status":"DOWN"}` only; no details.
 
 ## Rate limits, proxy, and CORS
 
-Counters are in-memory; v1 runs one instance. Login: 5 failed attempts per rolling 15 minutes keyed by socket client IP + lowercase email; success resets key. Registration: 10/hour/IP. Anonymous contact: 5/hour/IP. Every 429 has `Retry-After` seconds. Use socket IP unless `RMS_TRUST_PROXY=true`, when `X-Forwarded-For` is trusted. Multi-instance deployment requires shared counters such as Redis.
+Counters are in-memory; v1 runs one instance. Login: 5 failed attempts per rolling 15 minutes keyed by socket client IP + lowercase email; success resets key. Registration: 10/hour/IP. Anonymous contact: 5/hour/IP. Every 429 has `Retry-After` seconds. Use socket IP unless `RMS_TRUST_PROXY=true`. When trusted, select the X-Forwarded-For entry this many positions from the right, configured by `RMS_TRUSTED_PROXY_HOPS` (default 1, allowed 1-5); if the chain is shorter, clamp to the leftmost available entry. Confirm the correct hop count for the deployment's proxy chain. Multi-instance deployment requires shared counters such as Redis.
 
 CORS allowed origins come from comma-separated `RMS_CORS_ALLOWED_ORIGINS`. Allow only required methods and headers. Never use wildcard origins with credentials or authorization headers.
 

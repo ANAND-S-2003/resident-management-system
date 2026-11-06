@@ -129,6 +129,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-test.selft
 
 The PowerShell smoke test is not run in GitHub Actions; CI uses backend tests and Playwright instead.
 
+## Docker image and Render deployment
+
+Build the backend image from the repository root with `docker build -t rms-backend:local ./backend`. For Render, use `backend/Dockerfile`, set `SPRING_PROFILES_ACTIVE=prod`, and configure the required database, JWT and super-admin environment variables in Render. Render supplies `PORT`; local container runs default to 8080. For Aiven or another TLS-required MySQL service, use the JDBC URL format documented in [docs/environment.md](docs/environment.md). Keep `RMS_DB_POOL_MAX` within the database connection budget and confirm `RMS_TRUSTED_PROXY_HOPS` against Render's forwarded-header chain after the first deployment.
+
+To run the image locally against the Compose database from the repository root:
+
+```powershell
+docker compose up -d db
+docker build -t rms-backend:local ./backend
+docker run --rm --name rms-backend -p 8080:8080 --env-file .env -e "RMS_DB_URL=jdbc:mysql://host.docker.internal:3307/rms?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true" -e "SPRING_PROFILES_ACTIVE=prod" rms-backend:local
+```
+
+The `--env-file` supplies local database credentials and the required JWT and bootstrap settings. The URL override makes the container connect to the host-published MySQL port. Stop it with Ctrl+C; stop MySQL with `docker compose down` when finished.
+
 ## Design decisions
 
 - All account types share one `users` table with a role column.

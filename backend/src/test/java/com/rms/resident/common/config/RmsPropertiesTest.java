@@ -30,6 +30,8 @@ class RmsPropertiesTest {
             assertThat(context.getBean(RmsProperties.class).rateLimitLoginMax()).isEqualTo(5);
             assertThat(context.getBean(RmsProperties.class).rateLimitRegisterMax()).isEqualTo(10);
             assertThat(context.getBean(RmsProperties.class).rateLimitContactMax()).isEqualTo(5);
+            assertThat(context.getBean(RmsProperties.class).dbPoolMax()).isEqualTo(5);
+            assertThat(context.getBean(RmsProperties.class).trustedProxyHops()).isEqualTo(1);
         });
     }
 
@@ -44,6 +46,34 @@ class RmsPropertiesTest {
                     assertThat(properties.rateLimitRegisterMax()).isEqualTo(42);
                     assertThat(properties.rateLimitContactMax()).isEqualTo(99);
                 });
+    }
+
+    @Test
+    void acceptsDatabasePoolAndTrustedProxyHopOverrides() {
+        runner.withPropertyValues(validProperties())
+                .withPropertyValues("rms.db-pool-max=14", "rms.trusted-proxy-hops=3")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    RmsProperties properties = context.getBean(RmsProperties.class);
+                    assertThat(properties.dbPoolMax()).isEqualTo(14);
+                    assertThat(properties.trustedProxyHops()).isEqualTo(3);
+                });
+    }
+
+    @Test
+    void rejectsDatabasePoolOutsideOneToTwenty() {
+        runner.withPropertyValues(validProperties()).withPropertyValues("rms.db-pool-max=21")
+                .run(context -> assertFailureMentions(context, "RMS_DB_POOL_MAX"));
+        runner.withPropertyValues(validProperties()).withPropertyValues("rms.db-pool-max=0")
+                .run(context -> assertFailureMentions(context, "RMS_DB_POOL_MAX"));
+    }
+
+    @Test
+    void rejectsTrustedProxyHopsOutsideOneToFive() {
+        runner.withPropertyValues(validProperties()).withPropertyValues("rms.trusted-proxy-hops=6")
+                .run(context -> assertFailureMentions(context, "RMS_TRUSTED_PROXY_HOPS"));
+        runner.withPropertyValues(validProperties()).withPropertyValues("rms.trusted-proxy-hops=0")
+                .run(context -> assertFailureMentions(context, "RMS_TRUSTED_PROXY_HOPS"));
     }
 
     @Test

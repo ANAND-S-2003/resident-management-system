@@ -13,6 +13,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend-image:
+    name: Build backend Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build backend image without publishing
+        run: docker build --tag rms-backend:ci ./backend
+
   backend:
     name: Backend verification
     runs-on: ubuntu-latest

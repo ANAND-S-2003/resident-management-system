@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 import com.rms.resident.common.validation.PasswordPolicy;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.validation.annotation.Validated;
 
 import java.nio.charset.StandardCharsets;
@@ -27,8 +28,18 @@ public record RmsProperties(
         @DefaultValue("false") boolean trustProxy,
         @DefaultValue("5") @Min(value = 1, message = "RMS_RATE_LIMIT_LOGIN_MAX must be between 1 and 10000") @Max(value = 10000, message = "RMS_RATE_LIMIT_LOGIN_MAX must be between 1 and 10000") int rateLimitLoginMax,
         @DefaultValue("10") @Min(value = 1, message = "RMS_RATE_LIMIT_REGISTER_MAX must be between 1 and 10000") @Max(value = 10000, message = "RMS_RATE_LIMIT_REGISTER_MAX must be between 1 and 10000") int rateLimitRegisterMax,
-        @DefaultValue("5") @Min(value = 1, message = "RMS_RATE_LIMIT_CONTACT_MAX must be between 1 and 10000") @Max(value = 10000, message = "RMS_RATE_LIMIT_CONTACT_MAX must be between 1 and 10000") int rateLimitContactMax
+        @DefaultValue("5") @Min(value = 1, message = "RMS_RATE_LIMIT_CONTACT_MAX must be between 1 and 10000") @Max(value = 10000, message = "RMS_RATE_LIMIT_CONTACT_MAX must be between 1 and 10000") int rateLimitContactMax,
+        @DefaultValue("5") @Min(value = 1, message = "RMS_DB_POOL_MAX must be between 1 and 20") @Max(value = 20, message = "RMS_DB_POOL_MAX must be between 1 and 20") int dbPoolMax,
+        @DefaultValue("1") @Min(value = 1, message = "RMS_TRUSTED_PROXY_HOPS must be between 1 and 5") @Max(value = 5, message = "RMS_TRUSTED_PROXY_HOPS must be between 1 and 5") int trustedProxyHops
 ) {
+    public RmsProperties(String jwtSecret, String superadminEmail, String superadminName, String superadminPassword,
+                         String timezone, List<String> corsAllowedOrigins, boolean trustProxy,
+                         int rateLimitLoginMax, int rateLimitRegisterMax, int rateLimitContactMax) {
+        this(jwtSecret, superadminEmail, superadminName, superadminPassword, timezone, corsAllowedOrigins,
+                trustProxy, rateLimitLoginMax, rateLimitRegisterMax, rateLimitContactMax, 5, 1);
+    }
+
+    @ConstructorBinding
     public RmsProperties {
         if (superadminEmail != null) superadminEmail = superadminEmail.trim().toLowerCase(java.util.Locale.ROOT);
         if (superadminName != null) superadminName = superadminName.trim();
@@ -64,7 +75,8 @@ public record RmsProperties(
     public String toString() {
         return "RmsProperties[jwtSecret=[REDACTED], superadminEmail=" + superadminEmail
                 + ", superadminName=" + superadminName + ", superadminPassword=[REDACTED], timezone="
-                + timezone + ", corsAllowedOrigins=" + corsAllowedOrigins + ", trustProxy=" + trustProxy + "]";
+                + timezone + ", corsAllowedOrigins=" + corsAllowedOrigins + ", trustProxy=" + trustProxy
+                + ", trustedProxyHops=" + trustedProxyHops + ", dbPoolMax=" + dbPoolMax + "]";
     }
 }
 
