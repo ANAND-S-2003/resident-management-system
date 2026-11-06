@@ -30,7 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const restoredUser = useQuery({
     queryKey: queryKeys.currentUser,
-    queryFn: ({ signal }) => apiRequest<UserSummary>('/auth/me', { token: storedSession?.token ?? null, signal }),
+    // Do not consume the query signal here: React.StrictMode's development
+    // remount would abort and restart this one-time startup validation.
+    queryFn: () => apiRequest<UserSummary>('/auth/me', { token: storedSession?.token ?? null }),
     // Validation runs only while the live provider state is loading. Once it
     // rejects, anonymous state disables this query even if the startup snapshot
     // still contains the old token.

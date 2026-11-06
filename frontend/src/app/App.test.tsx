@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { createMemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -92,6 +93,21 @@ describe('real application router composition', () => {
     writeSession({ token: 'expired-token', expiresAt: '2000-01-01T00:00:00Z', user: { id: 81, fullName: 'Expired User', email: 'expired@example.test', role: 'USER', flatNumber: 'U-81', active: true } });
     renderProductionApp('/resident');
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('validates a stored session exactly once during StrictMode startup', async () => {
+    let authMeRequests = 0;
+    writeSession({ token: 'inactive-token', expiresAt: expiry(), user: { id: 84, fullName: 'Inactive Resident', email: 'inactive@example.test', role: 'USER', flatNumber: 'I-84', active: true } });
+    server.use(http.get(testApiUrl('/auth/me'), () => {
+      authMeRequests += 1;
+      return HttpResponse.json({ timestamp: expiry(), status: 401, code: 'UNAUTHENTICATED', message: 'Your session has expired. Please sign in again.', path: '/api/v1/auth/me', details: [] }, { status: 401 });
+    }));
+    const router = createMemoryRouter(appRoutes, { initialEntries: ['/resident'] });
+    render(<StrictMode><App router={router} /></StrictMode>);
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    expect(authMeRequests).toBe(1);
   });
 
   it('handles parallel rejected-session queries once and disables them after logout', async () => {
