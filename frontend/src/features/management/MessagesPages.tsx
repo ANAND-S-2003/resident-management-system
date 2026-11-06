@@ -188,10 +188,7 @@ export function MessageDetailPage() {
   return (
     <>
       <PageHeader title={message.subject} description="Contact message" />
-      <section
-        className="message-detail"
-        aria-label="Message details"
-      >
+      <section className="message-detail" aria-label="Message details">
         <Card className="message-detail-card">
           <dl>
             <div>

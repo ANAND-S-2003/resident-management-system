@@ -1,25 +1,25 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { TEST_API_ORIGIN } from './src/test/api-url';
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { TEST_API_ORIGIN } from "./src/test/api-url";
 
-const root = fileURLToPath(new URL('.', import.meta.url));
+const root = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { '@': path.resolve(root, './src') } },
+  resolve: { alias: { "@": path.resolve(root, "./src") } },
   server: {
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/actuator': 'http://localhost:8080',
+      "/api": "http://localhost:8080",
+      "/actuator": "http://localhost:8080",
     },
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     environmentOptions: { jsdom: { url: TEST_API_ORIGIN } },
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    setupFiles: './src/test/setup.ts',
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    setupFiles: "./src/test/setup.ts",
     globals: true,
     css: true,
   },
