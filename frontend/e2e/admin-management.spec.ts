@@ -150,6 +150,13 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
   const residentContext = await browser.newContext();
   const residentPage = await residentContext.newPage();
   const browserFailures = monitorExpectedBrowserFailures(residentPage);
+  const residentApiRequests: string[] = [];
+  residentPage.on("request", (apiRequest) => {
+    const url = new URL(apiRequest.url());
+    if (url.pathname.startsWith("/api/v1/")) {
+      residentApiRequests.push(`${apiRequest.method()} ${url.pathname}`);
+    }
+  });
   await installSession(residentPage, residentSession);
   await residentPage.goto("/resident");
   await expect(
@@ -169,6 +176,12 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
   expect((await deactivateResponse).status()).toBe(200);
   await residentPage.goto("/resident/requests");
   await expect(mainHeading(residentPage, headings.login)).toBeVisible();
+  const apiRequestCountAfterLogout = residentApiRequests.length;
+  await residentPage.waitForTimeout(3_000);
+  expect(
+    residentApiRequests,
+    "No API requests should be sent for three seconds after the deactivated session is rejected",
+  ).toHaveLength(apiRequestCountAfterLogout);
   const badLogin = await signIn(
     residentPage,
     resident.email,
@@ -191,6 +204,12 @@ test("ADMIN creates, edits, deactivates and reactivates a resident account", asy
     mainHeading(residentPage, `Welcome, ${resident.fullName.split(" ")[0]}`),
   ).toBeVisible();
   browserFailures.assertExpectedFailures([
+    {
+      method: "GET",
+      path: "/api/v1/auth/me",
+      status: 401,
+      reason: "deactivated resident session is rejected during startup validation",
+    },
     {
       method: "POST",
       path: "/api/v1/auth/login",
