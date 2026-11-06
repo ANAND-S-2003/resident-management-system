@@ -10,6 +10,7 @@
     "typecheck": "tsc -b --pretty",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
