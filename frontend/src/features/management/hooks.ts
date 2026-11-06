@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { ContactQueryRequest, CreateServiceRequest, CreateUserRequest, ServiceQuery, SetActiveRequest, UpdateServiceRequest, UpdateUserRequest, UserQuery } from '@/lib/api/types';
 import { managementApi } from './api';
+import { useIsAuthenticated } from '@/features/auth/AuthProvider';
 
-export function useUsers(params: UserQuery) { return useQuery({ queryKey: queryKeys.users.list(params), queryFn: ({ signal }) => managementApi.users(params, signal) }); }
-export function useUser(id: number, enabled = true) { return useQuery({ queryKey: queryKeys.users.detail(id), queryFn: ({ signal }) => managementApi.user(id, signal), enabled }); }
-export function useServicesAdmin(params: ServiceQuery) { return useQuery({ queryKey: queryKeys.services.list(params), queryFn: ({ signal }) => managementApi.services(params, signal) }); }
-export function useService(id: number, enabled = true) { return useQuery({ queryKey: queryKeys.services.detail(id), queryFn: ({ signal }) => managementApi.service(id, signal), enabled }); }
-export function useContactQueries(params: { page: number; size: number; sort: string }) { return useQuery({ queryKey: queryKeys.contactQueries.list(params), queryFn: ({ signal }) => managementApi.contactQueries(params, signal) }); }
-export function useContactQuery(id: number, enabled = true) { return useQuery({ queryKey: queryKeys.contactQueries.detail(id), queryFn: ({ signal }) => managementApi.contactQuery(id, signal), enabled }); }
+export function useUsers(params: UserQuery) { const authenticated = useIsAuthenticated(); return useQuery({ queryKey: queryKeys.users.list(params), queryFn: ({ signal }) => managementApi.users(params, signal), enabled: authenticated }); }
+export function useUser(id: number, enabled = true) { const authenticated = useIsAuthenticated(); return useQuery({ queryKey: queryKeys.users.detail(id), queryFn: ({ signal }) => managementApi.user(id, signal), enabled: enabled && authenticated }); }
+export function useServicesAdmin(params: ServiceQuery) { const authenticated = useIsAuthenticated(); return useQuery({ queryKey: queryKeys.services.list(params), queryFn: ({ signal }) => managementApi.services(params, signal), enabled: authenticated }); }
+export function useService(id: number, enabled = true) { const authenticated = useIsAuthenticated(); return useQuery({ queryKey: queryKeys.services.detail(id), queryFn: ({ signal }) => managementApi.service(id, signal), enabled: enabled && authenticated }); }
+export function useContactQueries(params: { page: number; size: number; sort: string }) { const authenticated = useIsAuthenticated(); return useQuery({ queryKey: queryKeys.contactQueries.list(params), queryFn: ({ signal }) => managementApi.contactQueries(params, signal), enabled: authenticated }); }
+export function useContactQuery(id: number, enabled = true) { const authenticated = useIsAuthenticated(); return useQuery({ queryKey: queryKeys.contactQueries.detail(id), queryFn: ({ signal }) => managementApi.contactQuery(id, signal), enabled: enabled && authenticated }); }
 
 export function useCreateUser() {
   const client = useQueryClient();

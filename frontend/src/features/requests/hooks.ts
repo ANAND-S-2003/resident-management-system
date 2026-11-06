@@ -2,37 +2,46 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import type { NotificationItem, NotificationQuery, RequestCreateRequest, RequestQuery, ServiceQuery, ChangePasswordRequest, UpdateServiceRequestBody } from '@/lib/api/types';
 import { requestApi } from './api';
+import { useIsAuthenticated } from '@/features/auth/AuthProvider';
 
 export function useServices(params: ServiceQuery = {}) {
-  return useQuery({ queryKey: queryKeys.services.list(params), queryFn: ({ signal }) => requestApi.services(params, signal) });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.services.list(params), queryFn: ({ signal }) => requestApi.services(params, signal), enabled: authenticated });
 }
 
 export function useRequests(params: RequestQuery = {}) {
-  return useQuery({ queryKey: queryKeys.requests.list(params), queryFn: ({ signal }) => requestApi.requests(params, signal) });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.requests.list(params), queryFn: ({ signal }) => requestApi.requests(params, signal), enabled: authenticated });
 }
 
 export function useRequest(id: number, enabled = true) {
-  return useQuery({ queryKey: queryKeys.requests.detail(id), queryFn: ({ signal }) => requestApi.request(id, signal), enabled });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.requests.detail(id), queryFn: ({ signal }) => requestApi.request(id, signal), enabled: enabled && authenticated });
 }
 
 export function useRequestHistory(id: number, enabled = true) {
-  return useQuery({ queryKey: queryKeys.requests.history(id), queryFn: ({ signal }) => requestApi.history(id, signal), enabled });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.requests.history(id), queryFn: ({ signal }) => requestApi.history(id, signal), enabled: enabled && authenticated });
 }
 
 export function useDashboardSummary() {
-  return useQuery({ queryKey: queryKeys.dashboard.summary, queryFn: ({ signal }) => requestApi.dashboardSummary(signal), refetchOnWindowFocus: true });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.dashboard.summary, queryFn: ({ signal }) => requestApi.dashboardSummary(signal), enabled: authenticated, refetchOnWindowFocus: true });
 }
 
 export function useStaffRequests(params: RequestQuery = {}) {
-  return useQuery({ queryKey: queryKeys.staffRequests.list(params), queryFn: ({ signal }) => requestApi.requests(params, signal), refetchOnWindowFocus: true });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.staffRequests.list(params), queryFn: ({ signal }) => requestApi.requests(params, signal), enabled: authenticated, refetchOnWindowFocus: true });
 }
 
 export function useStaffRequest(id: number, enabled = true) {
-  return useQuery({ queryKey: queryKeys.staffRequests.detail(id), queryFn: ({ signal }) => requestApi.request(id, signal), enabled, refetchOnWindowFocus: true });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.staffRequests.detail(id), queryFn: ({ signal }) => requestApi.request(id, signal), enabled: enabled && authenticated, refetchOnWindowFocus: true });
 }
 
 export function useStaffRequestHistory(id: number, enabled = true) {
-  return useQuery({ queryKey: queryKeys.staffRequests.history(id), queryFn: ({ signal }) => requestApi.history(id, signal), enabled, refetchOnWindowFocus: true });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.staffRequests.history(id), queryFn: ({ signal }) => requestApi.history(id, signal), enabled: enabled && authenticated, refetchOnWindowFocus: true });
 }
 
 export function useUpdateStaffRequest(id: number) {
@@ -55,14 +64,16 @@ export function useUpdateStaffRequest(id: number) {
 }
 
 export function useNotifications(params: NotificationQuery = {}) {
-  return useQuery({ queryKey: queryKeys.notifications.list(params), queryFn: ({ signal }) => requestApi.notifications(params, signal) });
+  const authenticated = useIsAuthenticated();
+  return useQuery({ queryKey: queryKeys.notifications.list(params), queryFn: ({ signal }) => requestApi.notifications(params, signal), enabled: authenticated });
 }
 
 export function useUnreadCount(enabled = true) {
+  const authenticated = useIsAuthenticated();
   return useQuery({
     queryKey: queryKeys.notifications.unreadCount,
     queryFn: ({ signal }) => requestApi.unreadCount(signal),
-    enabled,
+    enabled: enabled && authenticated,
     refetchInterval: () => document.visibilityState === 'visible' ? 60_000 : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,

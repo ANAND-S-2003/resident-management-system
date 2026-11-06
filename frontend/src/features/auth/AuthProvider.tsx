@@ -24,17 +24,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [storedSession] = useState(readSession);
   const storedSessionValid = !!storedSession && Date.parse(storedSession.expiresAt) > Date.now();
+  const loggingOut = useRef(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const restoredUser = useQuery({
     queryKey: queryKeys.currentUser,
     queryFn: ({ signal }) => apiRequest<UserSummary>('/auth/me', { token: storedSession?.token ?? null, signal }),
-    enabled: storedSessionValid,
+    // Validation runs only while the live provider state is loading. Once it
+    // rejects, anonymous state disables this query even if the startup snapshot
+    // still contains the old token.
+    enabled: status === 'loading' && storedSessionValid,
     retry: false,
   });
 
   const logout = useCallback((expired = false) => {
+    if (loggingOut.current || (!session && !readSession())) return;
+    loggingOut.current = true;
+    initialRestoreHandled.current = true;
     clearStoredSession();
     setTokenProvider(() => null);
     setSession(null);
@@ -43,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     if (expired) setNotice('Your session has expired. Please sign in again.');
     if (location.pathname !== '/login') navigate('/login', { replace: true, state: { message: expired ? 'Your session has expired. Please sign in again.' : undefined } });
-  }, [location.pathname, navigate, queryClient]);
+  }, [location.pathname, navigate, queryClient, session]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => logout(true));
@@ -64,10 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       initialRestoreHandled.current = true;
     } else if (restoredUser.isError) {
       const invalidSession = restoredUser.error instanceof Error && 'status' in restoredUser.error && restoredUser.error.status === 401;
-      if (invalidSession) { clearStoredSession(); setSession(null); setStatus('anonymous'); initialRestoreHandled.current = true; }
+      if (invalidSession) { initialRestoreHandled.current = true; logout(true); }
       else setStatus('error');
     }
-  }, [restoredUser.data, restoredUser.error, restoredUser.isError, storedSession, storedSessionValid]);
+  }, [restoredUser.data, restoredUser.error, restoredUser.isError, storedSession, storedSessionValid, logout]);
 
   useEffect(() => {
     if (!session) return;
@@ -102,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const next: AuthSession = { token: result.accessToken, expiresAt: result.expiresAt, user: { ...result.user, active: true } };
     // Publish the token before protected route queries mount after navigation.
     setTokenProvider(() => next.token);
+    loggingOut.current = false;
     writeSession(next); setSession(next); setStatus('authenticated'); setNotice(null);
     queryClient.setQueryData(queryKeys.currentUser, next.user);
     return next.user;
@@ -120,4 +128,9 @@ export function useAuth(): AuthContextValue {
   const value = useContext(AuthContext);
   if (!value) throw new Error('useAuth must be used inside AuthProvider');
   return value;
+}
+
+/** Live auth state for enabling queries that require an authenticated session. */
+export function useIsAuthenticated(): boolean {
+  return useAuth().status === 'authenticated';
 }
