@@ -13,7 +13,7 @@ import { LoginPage } from './LoginPage';
 import { RegisterPage } from './RegisterPage';
 import { AppShell } from '@/app/layout';
 import { PageHeader } from '@/components/ui';
-import { writeSession } from './session';
+import { readSession, writeSession } from './session';
 import { queryKeys } from '@/lib/query-keys';
 
 function renderAuth(node: ReactNode) {
@@ -37,6 +37,8 @@ describe('authentication pages', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('NeverRenderThis123');
+    expect(readSession()).toBeNull();
+    expect(screen.getByLabelText('Current path')).toHaveTextContent('/');
   });
   it('registers and signs in automatically', async () => {
     const user = userEvent.setup();

@@ -67,6 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       initialRestoreHandled.current = true;
     } else if (restoredUser.data && storedSession) {
       const next = { ...storedSession, user: restoredUser.data };
+      // Publish the validated token before enabling authenticated child queries.
+      setTokenProvider(() => next.token);
       writeSession(next); setSession(next); setStatus('authenticated');
       initialRestoreHandled.current = true;
     } else if (restoredUser.isError) {

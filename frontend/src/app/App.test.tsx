@@ -1,13 +1,13 @@
 import { createMemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { App } from './App';
 import { appRoutes } from './router';
 import { server } from '@/test/server';
 import { testApiUrl } from '@/test/api-url';
-import { writeSession } from '@/features/auth/session';
+import { readSession, writeSession } from '@/features/auth/session';
 
 type TestRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
 const expiry = () => new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -92,6 +92,34 @@ describe('real application router composition', () => {
     writeSession({ token: 'expired-token', expiresAt: '2000-01-01T00:00:00Z', user: { id: 81, fullName: 'Expired User', email: 'expired@example.test', role: 'USER', flatNumber: 'U-81', active: true } });
     renderProductionApp('/resident');
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('handles parallel rejected-session queries once and disables them after logout', async () => {
+    const counts: Record<string, number> = { me: 0, requests: 0, unread: 0 };
+    const unauthorized = (path: string) => ({ timestamp: expiry(), status: 401, code: 'UNAUTHENTICATED', message: 'Unauthorized', path, details: [] });
+    writeSession({ token: 'rejected-token', expiresAt: expiry(), user: { id: 83, fullName: 'Rejected User', email: 'rejected@example.test', role: 'USER', flatNumber: 'R-83', active: true } });
+    server.use(
+      http.get(testApiUrl('/auth/me'), () => { counts.me += 1; return HttpResponse.json({ id: 83, fullName: 'Rejected User', email: 'rejected@example.test', role: 'USER', flatNumber: 'R-83', active: true }); }),
+      http.get(testApiUrl('/requests'), () => { counts.requests += 1; return HttpResponse.json(unauthorized('/api/v1/requests'), { status: 401 }); }),
+      http.get(testApiUrl('/notifications/unread-count'), () => { counts.unread += 1; return HttpResponse.json(unauthorized('/api/v1/notifications/unread-count'), { status: 401 }); }),
+    );
+    const { router } = renderProductionApp('/resident');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
+    expect(await screen.findByText('Your session has expired. Please sign in again.')).toBeInTheDocument();
+    expect(readSession()).toBeNull();
+    expect(counts.me).toBe(1);
+    expect(counts.requests).toBeGreaterThan(0);
+    expect(counts.unread).toBeGreaterThan(0);
+    const after401 = { ...counts };
+    vi.useFakeTimers();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('online'));
+    });
+    await Promise.resolve();
+    expect(counts).toEqual(after401);
+    vi.useRealTimers();
   });
 
   it('keeps a newly authenticated session instead of clearing the empty startup snapshot', async () => {
